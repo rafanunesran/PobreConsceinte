@@ -1,4 +1,4 @@
-import { CreditCard, Home, User, Wallet, type LucideIcon } from 'lucide-react'
+import { CreditCard, Home, Receipt, User, Wallet, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -13,5 +13,6 @@ export const navItems: NavItem[] = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/cartoes', label: 'Cartões', icon: CreditCard, end: false },
   { to: '/contas', label: 'Contas', icon: Wallet, end: false },
+  { to: '/registros/novo', label: 'Despesa', icon: Receipt, end: false },
   { to: '/perfil', label: 'Perfil', icon: User, end: false },
 ]

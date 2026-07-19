@@ -8,8 +8,13 @@ export interface Transaction {
   date: string // 'YYYY-MM-DD', de <input type="date">
   description: string
   categoryId: string
+  paid: boolean // controla se a transação afeta o saldo da conta vinculada
   accountId?: string // presente sse account-linked
   cardId?: string // presente sse card-linked (só em expenses)
+  recurringRuleId?: string // presente sse gerada por uma regra de recorrência fixa
+  installmentGroupId?: string // presente sse parte de um parcelamento
+  installmentIndex?: number // 1-based
+  installmentTotal?: number
 }
 
 export interface TransactionFormData {
@@ -18,6 +23,11 @@ export interface TransactionFormData {
   date: string
   description: string
   categoryId: string
+  paid: boolean
   accountId?: string
   cardId?: string
+  recurringRuleId?: string
+  installmentGroupId?: string
+  installmentIndex?: number
+  installmentTotal?: number
 }

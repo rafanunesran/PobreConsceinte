@@ -20,6 +20,15 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       date: t.date,
       description: t.description,
       categoryId: t.categoryId,
+      paid: t.paid,
+      ...(t.recurringRuleId !== undefined ? { recurringRuleId: t.recurringRuleId } : {}),
+      ...(t.installmentGroupId !== undefined
+        ? {
+            installmentGroupId: t.installmentGroupId,
+            installmentIndex: t.installmentIndex,
+            installmentTotal: t.installmentTotal,
+          }
+        : {}),
     }
     return t.accountId !== undefined ? { ...base, accountId: t.accountId } : { ...base, cardId: t.cardId }
   },
@@ -28,6 +37,9 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
     const type: TransactionType = TRANSACTION_TYPES.includes(data.type) ? data.type : 'expense'
     const accountId = typeof data.accountId === 'string' ? data.accountId : undefined
     const cardId = typeof data.cardId === 'string' ? data.cardId : undefined
+    const recurringRuleId = typeof data.recurringRuleId === 'string' ? data.recurringRuleId : undefined
+    const installmentGroupId =
+      typeof data.installmentGroupId === 'string' ? data.installmentGroupId : undefined
     return {
       id: snapshot.id,
       type,
@@ -35,8 +47,19 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       date: typeof data.date === 'string' ? data.date : '',
       description: typeof data.description === 'string' ? data.description : '',
       categoryId: typeof data.categoryId === 'string' ? data.categoryId : '',
+      // NOTE: doc pré-existente sem `paid` degrada pra `false`, nunca
+      // `true` por engano — não pode assumir que algo já foi pago.
+      paid: typeof data.paid === 'boolean' ? data.paid : false,
       ...(accountId !== undefined ? { accountId } : {}),
       ...(cardId !== undefined ? { cardId } : {}),
+      ...(recurringRuleId !== undefined ? { recurringRuleId } : {}),
+      ...(installmentGroupId !== undefined
+        ? {
+            installmentGroupId,
+            installmentIndex: typeof data.installmentIndex === 'number' ? data.installmentIndex : 1,
+            installmentTotal: typeof data.installmentTotal === 'number' ? data.installmentTotal : 1,
+          }
+        : {}),
     }
   },
 }
@@ -45,14 +68,17 @@ export function transactionsCollection(uid: string) {
   return collection(db, 'users', uid, 'transactions').withConverter(transactionConverter)
 }
 
-function transactionDoc(uid: string, transactionId: string) {
+export function transactionDoc(uid: string, transactionId: string) {
   return doc(db, 'users', uid, 'transactions', transactionId).withConverter(transactionConverter)
 }
 
 // Efeito assinado no saldo: income soma, expense subtrai. Só se aplica a
-// transações vinculadas a conta — card-linked nunca passa por aqui (cartão
-// não tem campo de saldo, só `limit`; "fatura" fica pra outra fase).
-function signedEffect(type: TransactionType, amount: number): number {
+// transações vinculadas a conta E marcadas como pagas — card-linked nunca
+// passa por aqui (cartão não tem campo de saldo, só `limit`; "fatura" fica
+// pra outra fase), e não-pagas não afetam saldo até serem confirmadas
+// (essencial pra recorrência/parcelamento: as ocorrências futuras nascem
+// não-pagas e não podem mexer no saldo antes de acontecerem de verdade).
+export function signedEffect(type: TransactionType, amount: number): number {
   return type === 'income' ? amount : -amount
 }
 
@@ -76,13 +102,17 @@ export async function createTransaction(uid: string, data: TransactionFormData):
   const newTxRef = doc(transactionsCollection(uid))
 
   await runTransaction(db, async (transaction) => {
+    // só lê a conta se ela puder de fato ser afetada — não-pagas nunca
+    // tocam no saldo, então nem vale a pena ler o doc.
     const accountSnap =
-      data.accountId !== undefined ? await transaction.get(accountDoc(uid, data.accountId)) : undefined
+      data.accountId !== undefined && data.paid === true
+        ? await transaction.get(accountDoc(uid, data.accountId))
+        : undefined
     if (accountSnap !== undefined && !accountSnap.exists()) {
       throw new Error('Conta vinculada não encontrada.')
     }
 
-    if (data.accountId !== undefined && accountSnap?.exists()) {
+    if (data.accountId !== undefined && data.paid === true && accountSnap?.exists()) {
       transaction.update(accountDoc(uid, data.accountId), {
         balance: accountSnap.data().balance + signedEffect(data.type, data.amount),
       })
@@ -102,34 +132,45 @@ export async function updateTransaction(
   const txRef = transactionDoc(uid, transactionId)
 
   await runTransaction(db, async (transaction) => {
-    // READ 1: transação existente, pra saber accountId/cardId/type/amount
-    // ANTIGOS — o caller só nos dá os dados NOVOS do form. Ler aqui dentro
-    // (em vez de confiar num valor já buscado antes) também protege contra
-    // stale data, já que o formulário pode ter ficado aberto um tempo.
+    // READ 1: transação existente, pra saber accountId/cardId/type/amount/
+    // paid ANTIGOS — o caller só nos dá os dados NOVOS do form. Ler aqui
+    // dentro (em vez de confiar num valor já buscado antes) também protege
+    // contra stale data, já que o formulário pode ter ficado aberto um tempo.
     const oldSnap = await transaction.get(txRef)
     if (!oldSnap.exists()) throw new Error('Transação não encontrada.')
     const oldData = oldSnap.data()
 
     const oldAccountId = oldData.accountId
     const newAccountId = data.accountId
-    const oldEffect = oldAccountId !== undefined ? signedEffect(oldData.type, oldData.amount) : 0
-    const newEffect = newAccountId !== undefined ? signedEffect(data.type, data.amount) : 0
-    const sameAccount = oldAccountId !== undefined && oldAccountId === newAccountId
+    // efeito é 0 a menos que a ponta em questão esteja vinculada a conta E
+    // marcada como paga — "marcar como pago" é só isso: um updateTransaction
+    // normal com paid:true, sem caminho de código novo.
+    const oldEffect =
+      oldAccountId !== undefined && oldData.paid === true ? signedEffect(oldData.type, oldData.amount) : 0
+    const newEffect = newAccountId !== undefined && data.paid === true ? signedEffect(data.type, data.amount) : 0
+    const sameAccount =
+      oldAccountId !== undefined &&
+      oldData.paid === true &&
+      newAccountId !== undefined &&
+      data.paid === true &&
+      oldAccountId === newAccountId
 
-    // READ 2: conta antiga (se houver). A ref só existe depois da READ 1,
-    // mas isso é permitido — a regra do Firestore é "todos os reads antes de
-    // qualquer write", não "refs precisam ser conhecidas de antemão".
+    // READ 2: conta antiga, só se ela de fato contribuiu pro saldo (paga).
+    // Se a transação nunca foi paga, não há nada pra reverter — cobre
+    // unpaid→unpaid e unpaid→paid sem tocar no doc da conta antiga.
     const oldAccountSnap =
-      oldAccountId !== undefined ? await transaction.get(accountDoc(uid, oldAccountId)) : undefined
+      oldAccountId !== undefined && oldData.paid === true
+        ? await transaction.get(accountDoc(uid, oldAccountId))
+        : undefined
     if (oldAccountSnap !== undefined && !oldAccountSnap.exists()) {
       throw new Error('Conta antiga vinculada não encontrada.')
     }
     const oldAccountBalance = oldAccountSnap?.exists() ? oldAccountSnap.data().balance : undefined
 
-    // READ 3: conta nova, só se for DIFERENTE da antiga (evita ler o mesmo
-    // doc duas vezes).
+    // READ 3: conta nova, só se ela vai passar a contribuir E não é a mesma
+    // já lida acima (evita ler o mesmo doc duas vezes).
     const newAccountSnap =
-      newAccountId !== undefined && !sameAccount
+      newAccountId !== undefined && data.paid === true && !sameAccount
         ? await transaction.get(accountDoc(uid, newAccountId))
         : undefined
     if (newAccountSnap !== undefined && !newAccountSnap.exists()) {
@@ -166,12 +207,14 @@ export async function deleteTransaction(uid: string, transactionId: string): Pro
     const txData = txSnap.data()
 
     const accountSnap =
-      txData.accountId !== undefined ? await transaction.get(accountDoc(uid, txData.accountId)) : undefined
+      txData.accountId !== undefined && txData.paid === true
+        ? await transaction.get(accountDoc(uid, txData.accountId))
+        : undefined
     if (accountSnap !== undefined && !accountSnap.exists()) {
       throw new Error('Conta vinculada não encontrada.')
     }
 
-    if (txData.accountId !== undefined && accountSnap?.exists()) {
+    if (txData.accountId !== undefined && txData.paid === true && accountSnap?.exists()) {
       transaction.update(accountDoc(uid, txData.accountId), {
         balance: accountSnap.data().balance - signedEffect(txData.type, txData.amount),
       })

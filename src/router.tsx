@@ -118,6 +118,13 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'registros/pendentes',
+          lazy: async () => {
+            const { PendingTransactionsPage } = await import('./features/transactions/PendingTransactionsPage')
+            return { Component: PendingTransactionsPage }
+          },
+        },
+        {
           path: 'perfil',
           lazy: async () => {
             const { PerfilPage } = await import('./features/auth/PerfilPage')

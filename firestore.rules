@@ -47,9 +47,25 @@ service cloud.firestore {
         && request.resource.data.date is string
         && request.resource.data.description is string
         && request.resource.data.categoryId is string
+        && request.resource.data.paid is bool
         && (
           (request.resource.data.keys().hasAny(['accountId']) && !request.resource.data.keys().hasAny(['cardId']))
           || (request.resource.data.keys().hasAny(['cardId']) && !request.resource.data.keys().hasAny(['accountId']) && request.resource.data.type == 'expense')
+        );
+    }
+
+    match /users/{userId}/recurringRules/{ruleId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.amount is number && request.resource.data.amount > 0
+        && request.resource.data.description is string
+        && request.resource.data.categoryId is string
+        && request.resource.data.dayOfMonth is number
+        && request.resource.data.dayOfMonth >= 1 && request.resource.data.dayOfMonth <= 31
+        && request.resource.data.generatedUntil is string
+        && (
+          (request.resource.data.keys().hasAny(['accountId']) && !request.resource.data.keys().hasAny(['cardId']))
+          || (request.resource.data.keys().hasAny(['cardId']) && !request.resource.data.keys().hasAny(['accountId']))
         );
     }
 

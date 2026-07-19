@@ -12,6 +12,8 @@ import { Select } from '../../components/ui/Select'
 import { cn } from '../../lib/utils'
 import { expenseSchema, incomeSchema, type ExpenseFormData, type IncomeFormData } from './schemas'
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from './api'
+import { createRecurringExpense } from './recurring'
+import { createInstallmentExpense } from './installments'
 import type { TransactionFormData } from './types'
 
 type Kind = 'despesa' | 'receita'
@@ -48,11 +50,15 @@ export function TransactionFormPage() {
       linkedType: 'account',
       accountId: '',
       cardId: '',
+      paid: true,
+      recurrence: 'none',
+      installmentsCount: 2,
+      installmentAmountMode: 'total',
     },
   })
   const incomeForm = useForm<IncomeFormData>({
     resolver: zodResolver(incomeSchema),
-    defaultValues: { amount: 0, date: todayISO(), description: '', categoryId: '', accountId: '' },
+    defaultValues: { amount: 0, date: todayISO(), description: '', categoryId: '', accountId: '', paid: true },
   })
 
   useEffect(() => {
@@ -74,6 +80,10 @@ export function TransactionFormPage() {
             linkedType: transaction.accountId !== undefined ? 'account' : 'card',
             accountId: transaction.accountId ?? '',
             cardId: transaction.cardId ?? '',
+            paid: transaction.paid,
+            recurrence: 'none',
+            installmentsCount: 2,
+            installmentAmountMode: 'total',
           })
         } else {
           incomeForm.reset({
@@ -82,6 +92,7 @@ export function TransactionFormPage() {
             description: transaction.description,
             categoryId: transaction.categoryId,
             accountId: transaction.accountId ?? '',
+            paid: transaction.paid,
           })
         }
         setIsLoadingTransaction(false)
@@ -94,26 +105,60 @@ export function TransactionFormPage() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, transactionId, isExpense, navigate])
+  }, [user, transactionId, isExpense, navigate, expenseForm, incomeForm])
 
   if (!user) return null
 
   async function onSubmitExpense(data: ExpenseFormData) {
     if (!user) return
     setFormError(null)
-    const payload: TransactionFormData = {
-      type: 'expense',
-      amount: data.amount,
-      date: data.date,
-      description: data.description,
-      categoryId: data.categoryId,
-      ...(data.linkedType === 'account' ? { accountId: data.accountId } : { cardId: data.cardId }),
-    }
+    const linkage =
+      data.linkedType === 'account' ? { accountId: data.accountId } : { cardId: data.cardId }
+
     try {
       if (transactionId) {
+        // Edição só afeta esta ocorrência — não recria a série de
+        // recorrência/parcelamento.
+        const payload: TransactionFormData = {
+          type: 'expense',
+          amount: data.amount,
+          date: data.date,
+          description: data.description,
+          categoryId: data.categoryId,
+          paid: data.paid,
+          ...linkage,
+        }
         await updateTransaction(user.uid, transactionId, payload)
+      } else if (data.recurrence === 'fixed') {
+        await createRecurringExpense(
+          user.uid,
+          {
+            amount: data.amount,
+            description: data.description,
+            categoryId: data.categoryId,
+            dayOfMonth: Number(data.date.slice(-2)),
+            ...linkage,
+          },
+          data.paid,
+        )
+      } else if (data.recurrence === 'installments') {
+        await createInstallmentExpense(
+          user.uid,
+          { amount: data.amount, description: data.description, categoryId: data.categoryId, date: data.date, ...linkage },
+          data.installmentsCount ?? 2,
+          data.installmentAmountMode === 'perInstallment',
+          data.paid,
+        )
       } else {
+        const payload: TransactionFormData = {
+          type: 'expense',
+          amount: data.amount,
+          date: data.date,
+          description: data.description,
+          categoryId: data.categoryId,
+          paid: data.paid,
+          ...linkage,
+        }
         await createTransaction(user.uid, payload)
       }
       navigate('/registros')
@@ -132,6 +177,7 @@ export function TransactionFormPage() {
       description: data.description,
       categoryId: data.categoryId,
       accountId: data.accountId,
+      paid: data.paid,
     }
     try {
       if (transactionId) {
@@ -194,6 +240,10 @@ export function TransactionFormPage() {
   }
 
   const linkedType = expenseForm.watch('linkedType')
+  const recurrence = expenseForm.watch('recurrence')
+  const installmentAmountMode = expenseForm.watch('installmentAmountMode')
+  const expensePaid = expenseForm.watch('paid')
+  const incomePaid = incomeForm.watch('paid')
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">
@@ -294,6 +344,99 @@ export function TransactionFormPage() {
             </Select>
           )}
 
+          <button
+            type="button"
+            onClick={() => expenseForm.setValue('paid', !expensePaid)}
+            className={cn(
+              'flex items-center justify-between rounded-xl border px-4 py-2.5 text-sm font-medium transition-all duration-200',
+              expensePaid
+                ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+            )}
+          >
+            Já foi paga?
+            <span>{expensePaid ? 'Sim' : 'Não'}</span>
+          </button>
+
+          {!isEditMode ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm text-light-secondary dark:text-dark-secondary">Recorrência</span>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ['none', 'Nenhuma'],
+                    ['fixed', 'Fixa'],
+                    ['installments', 'Parcelamento'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => expenseForm.setValue('recurrence', value)}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      recurrence === value
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                        : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {recurrence === 'fixed' ? (
+                <p className="text-sm text-light-secondary dark:text-dark-secondary">
+                  Gera 12 lançamentos mensais no dia {expenseForm.watch('date').slice(-2)}, renovando
+                  automaticamente conforme se aproxima do fim.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {!isEditMode && recurrence === 'installments' ? (
+            <div className="flex flex-col gap-4 rounded-xl border border-border-light p-4 dark:border-border-dark">
+              <Input
+                label="Número de parcelas"
+                type="number"
+                min={2}
+                max={48}
+                error={expenseForm.formState.errors.installmentsCount?.message}
+                {...expenseForm.register('installmentsCount', { valueAsNumber: true })}
+              />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm text-light-secondary dark:text-dark-secondary">
+                  O valor informado é
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => expenseForm.setValue('installmentAmountMode', 'total')}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      installmentAmountMode === 'total'
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                        : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+                    )}
+                  >
+                    O total a parcelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => expenseForm.setValue('installmentAmountMode', 'perInstallment')}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      installmentAmountMode === 'perInstallment'
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                        : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+                    )}
+                  >
+                    O valor de cada parcela
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {formError ? <p className="text-sm text-danger">{formError}</p> : null}
 
           <Button type="submit" disabled={expenseForm.formState.isSubmitting}>
@@ -349,6 +492,20 @@ export function TransactionFormPage() {
               </option>
             ))}
           </Select>
+
+          <button
+            type="button"
+            onClick={() => incomeForm.setValue('paid', !incomePaid)}
+            className={cn(
+              'flex items-center justify-between rounded-xl border px-4 py-2.5 text-sm font-medium transition-all duration-200',
+              incomePaid
+                ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+            )}
+          >
+            Já foi recebida?
+            <span>{incomePaid ? 'Sim' : 'Não'}</span>
+          </button>
 
           {formError ? <p className="text-sm text-danger">{formError}</p> : null}
 
