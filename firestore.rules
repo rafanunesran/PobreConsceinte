@@ -1,0 +1,36 @@
+// NOTE: este arquivo não é aplicado automaticamente — não há pipeline de
+// deploy via Firebase CLI neste repo (o hosting é GitHub Pages, não Firebase
+// Hosting). Publique manualmente em: Firebase Console > Firestore Database >
+// Rules > colar este conteúdo > Publish. Mesmo passo manual já usado pra
+// habilitar os provedores de login.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/accounts/{accountId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.type in ['corrente', 'poupanca', 'carteira', 'investimento']
+        && request.resource.data.balance is number
+        && request.resource.data.currency == 'BRL';
+    }
+
+    match /users/{userId}/cards/{cardId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.brand is string
+        && request.resource.data.limit is number && request.resource.data.limit >= 0
+        && request.resource.data.closingDay is number
+        && request.resource.data.closingDay >= 1 && request.resource.data.closingDay <= 31
+        && request.resource.data.dueDay is number
+        && request.resource.data.dueDay >= 1 && request.resource.data.dueDay <= 31;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,8 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
-// NOTE: só Auth é inicializado nesta fase (Fase 1 é só fundação/login).
-// Firestore (getFirestore) entra na Fase 2, junto com o CRUD de contas.
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -26,3 +25,4 @@ for (const [key, value] of Object.entries(firebaseConfig)) {
 
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
+export const db = getFirestore(app)

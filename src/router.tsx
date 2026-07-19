@@ -1,7 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
-import { PlaceholderPage } from './components/layout/PlaceholderPage'
 
 export const router = createBrowserRouter(
   [
@@ -29,11 +28,45 @@ export const router = createBrowserRouter(
         },
         {
           path: 'cartoes',
-          element: <PlaceholderPage title="Cartões" />,
+          lazy: async () => {
+            const { CardsPage } = await import('./features/cards/CardsPage')
+            return { Component: CardsPage }
+          },
+        },
+        {
+          path: 'cartoes/novo',
+          lazy: async () => {
+            const { CardFormPage } = await import('./features/cards/CardFormPage')
+            return { Component: CardFormPage }
+          },
+        },
+        {
+          path: 'cartoes/:cardId/editar',
+          lazy: async () => {
+            const { CardFormPage } = await import('./features/cards/CardFormPage')
+            return { Component: CardFormPage }
+          },
         },
         {
           path: 'contas',
-          element: <PlaceholderPage title="Contas" />,
+          lazy: async () => {
+            const { AccountsPage } = await import('./features/accounts/AccountsPage')
+            return { Component: AccountsPage }
+          },
+        },
+        {
+          path: 'contas/nova',
+          lazy: async () => {
+            const { AccountFormPage } = await import('./features/accounts/AccountFormPage')
+            return { Component: AccountFormPage }
+          },
+        },
+        {
+          path: 'contas/:accountId/editar',
+          lazy: async () => {
+            const { AccountFormPage } = await import('./features/accounts/AccountFormPage')
+            return { Component: AccountFormPage }
+          },
         },
         {
           path: 'perfil',
