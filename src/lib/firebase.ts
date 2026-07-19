@@ -12,5 +12,17 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
+// NOTE: sem isso, uma env var ausente vira um erro críptico do SDK do
+// Firebase lá na frente (ex: "auth/invalid-api-key"), sem dizer qual
+// variável está faltando. Falhar aqui, cedo e explicitamente, é o que
+// permite ao <StartupError> (main.tsx) mostrar uma mensagem acionável.
+for (const [key, value] of Object.entries(firebaseConfig)) {
+  if (!value) {
+    throw new Error(
+      `Firebase: variável de ambiente "VITE_FIREBASE_${key.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}" não definida. Configure o .env local (veja .env.example) ou os GitHub Secrets do repositório.`,
+    )
+  }
+}
+
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
