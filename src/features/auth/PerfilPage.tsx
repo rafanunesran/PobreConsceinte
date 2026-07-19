@@ -1,19 +1,22 @@
 import { signOut } from 'firebase/auth'
-import { LogOut } from 'lucide-react'
+import { LogOut, Moon, Sun } from 'lucide-react'
 import { auth } from '../../lib/firebase'
 import { useAuthStore } from '../../stores/authStore'
+import { useThemeStore } from '../../stores/themeStore'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
 
 export function PerfilPage() {
   const user = useAuthStore((state) => state.user)
+  const theme = useThemeStore((state) => state.theme)
+  const toggleTheme = useThemeStore((state) => state.toggleTheme)
 
   // NOTE: PerfilPage só é renderizada atrás de <ProtectedRoute>, então
   // `user` nunca deveria ser null aqui — o guard é só pro TS não reclamar.
   if (!user) return null
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-[480px] flex-col items-center gap-6 bg-bg-light p-6 dark:bg-bg-dark">
+    <div className="flex flex-col items-center gap-6 px-6 pt-4">
       <Avatar
         src={user.photoURL}
         name={user.displayName ?? user.email}
@@ -27,10 +30,17 @@ export function PerfilPage() {
         <p className="text-sm text-light-secondary dark:text-dark-secondary">{user.email}</p>
       </div>
 
-      <Button variant="secondary" className="w-full max-w-xs" onClick={() => signOut(auth)}>
-        <LogOut size={20} />
-        Sair
-      </Button>
-    </main>
+      <div className="flex w-full max-w-xs flex-col gap-3">
+        <Button variant="secondary" onClick={toggleTheme}>
+          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+        </Button>
+
+        <Button variant="secondary" onClick={() => signOut(auth)}>
+          <LogOut size={20} />
+          Sair
+        </Button>
+      </div>
+    </div>
   )
 }
