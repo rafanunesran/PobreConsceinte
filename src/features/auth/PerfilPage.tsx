@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
-import { LogOut, Moon, Sun } from 'lucide-react'
+import { LogOut, Moon, Sun, Tag } from 'lucide-react'
 import { auth } from '../../lib/firebase'
 import { useAuthStore } from '../../stores/authStore'
 import { useThemeStore } from '../../stores/themeStore'
@@ -31,6 +32,13 @@ export function PerfilPage() {
       </div>
 
       <div className="flex w-full max-w-xs flex-col gap-3">
+        <Link to="/categorias">
+          <Button variant="secondary" className="w-full">
+            <Tag size={20} />
+            Gerenciar categorias
+          </Button>
+        </Link>
+
         <Button variant="secondary" onClick={toggleTheme}>
           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}

@@ -1,0 +1,129 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Plus } from 'lucide-react'
+import { useAuthStore } from '../../stores/authStore'
+import { useCategories } from './useCategories'
+import { createCategory } from './api'
+import { CATEGORY_ICON_COMPONENTS, CATEGORY_TYPE_LABELS, SUGGESTED_CATEGORIES, type Category, type CategoryType } from './types'
+import { Button } from '../../components/ui/Button'
+
+function CategoryChip({ category }: { category: Category }) {
+  const Icon = CATEGORY_ICON_COMPONENTS[category.icon]
+  return (
+    <Link
+      to={`/categorias/${category.id}/editar`}
+      className="flex items-center gap-2 rounded-xl border border-border-light bg-surface-light py-2 pl-2 pr-3 transition-colors duration-200 hover:border-brand-500 dark:border-border-dark dark:bg-surface-dark-elevated"
+    >
+      <span
+        className="flex h-8 w-8 items-center justify-center rounded-full text-white"
+        style={{ backgroundColor: category.color }}
+      >
+        <Icon size={16} />
+      </span>
+      <span className="text-sm text-light-primary dark:text-dark-primary">{category.name}</span>
+    </Link>
+  )
+}
+
+function SuggestionSection({
+  type,
+  categories,
+}: {
+  type: CategoryType
+  categories: Category[]
+}) {
+  const user = useAuthStore((state) => state.user)
+  const [creating, setCreating] = useState<string | null>(null)
+
+  const existingNames = new Set(categories.filter((c) => c.type === type).map((c) => c.name.toLowerCase()))
+  const suggestions = SUGGESTED_CATEGORIES.filter(
+    (s) => s.type === type && !existingNames.has(s.name.toLowerCase()),
+  )
+
+  if (!user || suggestions.length === 0) return null
+
+  async function handleCreate(suggestion: (typeof SUGGESTED_CATEGORIES)[number]) {
+    if (!user) return
+    setCreating(suggestion.name)
+    try {
+      // NOTE: sem refresh manual — useCategories usa onSnapshot (tempo
+      // real), a lista atualiza sozinha assim que o Firestore confirma.
+      await createCategory(user.uid, suggestion)
+    } finally {
+      setCreating(null)
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {suggestions.map((suggestion) => {
+        const Icon = CATEGORY_ICON_COMPONENTS[suggestion.icon]
+        return (
+          <button
+            key={suggestion.name}
+            type="button"
+            disabled={creating === suggestion.name}
+            onClick={() => handleCreate(suggestion)}
+            className="flex items-center gap-2 rounded-xl border border-dashed border-border-light py-2 pl-2 pr-3 text-light-secondary transition-colors duration-200 hover:border-brand-500 hover:text-brand-500 disabled:opacity-50 dark:border-border-dark dark:text-dark-secondary"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-border-light dark:bg-border-dark">
+              <Icon size={16} />
+            </span>
+            <span className="text-sm">{suggestion.name}</span>
+            <Plus size={14} />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export function CategoriesPage() {
+  const user = useAuthStore((state) => state.user)
+  const { categories, loading, error } = useCategories(user?.uid ?? '')
+
+  if (!user) return null
+
+  return (
+    <div className="flex flex-col gap-6 px-6 pt-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-light-primary dark:text-dark-primary">
+          Categorias
+        </h1>
+        <Link to="/categorias/nova">
+          <Button type="button" className="gap-1.5">
+            <Plus size={18} />
+            Nova
+          </Button>
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="h-24 animate-pulse rounded-2xl border border-border-light bg-surface-light dark:border-border-dark dark:bg-surface-dark-elevated" />
+      ) : error ? (
+        <p className="text-sm text-danger">
+          Não foi possível carregar suas categorias. Verifique sua conexão ou tente novamente
+          mais tarde.
+        </p>
+      ) : (
+        <>
+          {(['expense', 'income'] as const).map((type) => (
+            <div key={type} className="flex flex-col gap-3">
+              <h2 className="text-sm font-medium text-light-secondary dark:text-dark-secondary">
+                {CATEGORY_TYPE_LABELS[type]}
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {categories
+                  .filter((category) => category.type === type)
+                  .map((category) => (
+                    <CategoryChip key={category.id} category={category} />
+                  ))}
+              </div>
+              <SuggestionSection type={type} categories={categories} />
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}

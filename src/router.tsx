@@ -69,6 +69,55 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'categorias',
+          lazy: async () => {
+            const { CategoriesPage } = await import('./features/categories/CategoriesPage')
+            return { Component: CategoriesPage }
+          },
+        },
+        {
+          path: 'categorias/nova',
+          lazy: async () => {
+            const { CategoryFormPage } = await import('./features/categories/CategoryFormPage')
+            return { Component: CategoryFormPage }
+          },
+        },
+        {
+          path: 'categorias/:categoryId/editar',
+          lazy: async () => {
+            const { CategoryFormPage } = await import('./features/categories/CategoryFormPage')
+            return { Component: CategoryFormPage }
+          },
+        },
+        {
+          path: 'registros',
+          lazy: async () => {
+            const { RegistrosPage } = await import('./features/transactions/RegistrosPage')
+            return { Component: RegistrosPage }
+          },
+        },
+        {
+          path: 'registros/novo',
+          lazy: async () => {
+            const { RegistroChooserPage } = await import('./features/transactions/RegistroChooserPage')
+            return { Component: RegistroChooserPage }
+          },
+        },
+        {
+          path: 'registros/:kind/nova',
+          lazy: async () => {
+            const { TransactionFormPage } = await import('./features/transactions/TransactionFormPage')
+            return { Component: TransactionFormPage }
+          },
+        },
+        {
+          path: 'registros/:kind/:transactionId/editar',
+          lazy: async () => {
+            const { TransactionFormPage } = await import('./features/transactions/TransactionFormPage')
+            return { Component: TransactionFormPage }
+          },
+        },
+        {
           path: 'perfil',
           lazy: async () => {
             const { PerfilPage } = await import('./features/auth/PerfilPage')

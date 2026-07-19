@@ -40,7 +40,7 @@ export function accountsCollection(uid: string) {
   return collection(db, 'users', uid, 'accounts').withConverter(accountConverter)
 }
 
-function accountDoc(uid: string, accountId: string) {
+export function accountDoc(uid: string, accountId: string) {
   return doc(db, 'users', uid, 'accounts', accountId).withConverter(accountConverter)
 }
 
