@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -9,6 +10,7 @@ import {
 } from 'firebase/auth'
 import { FirebaseError } from 'firebase/app'
 import { auth } from '../../lib/firebase'
+import { useAuthStore } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import {
@@ -43,9 +45,19 @@ function mapAuthError(error: unknown): string {
 }
 
 export function LoginPage() {
+  const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
   const [mode, setMode] = useState<Mode>('login')
   const [formError, setFormError] = useState<string | null>(null)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+
+  // NOTE: signInWithPopup/signInWithEmailAndPassword só atualizam o estado
+  // global (via onAuthStateChanged, em authStore.ts) — não navegam sozinhos.
+  // É esse efeito que tira o usuário da tela de login assim que `user` deixa
+  // de ser null, cobrindo os três fluxos (Google, login e cadastro) de uma vez.
+  useEffect(() => {
+    if (user) navigate('/', { replace: true })
+  }, [user, navigate])
 
   const loginForm = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) })
   const signUpForm = useForm<SignUpFormData>({ resolver: zodResolver(signUpSchema) })
