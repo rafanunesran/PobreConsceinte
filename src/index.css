@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/* NOTE: dark mode é controlado por classe (.dark no <html>), não por
+   prefers-color-scheme, porque o tema é persistido via zustand/localStorage
+   e o usuário pode alternar manualmente (Checkpoint 3). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Hero balance em 32px (o padrão do Tailwind para text-3xl é 30px) */
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+
+  /* Marca */
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-glow: #10b98166;
+
+  /* Dark mode */
+  --color-bg-dark: #0a0a0b;
+  --color-surface-dark: #141416;
+  --color-surface-dark-elevated: #1c1c1f;
+  --color-border-dark: #26262a;
+  --color-dark-primary: #ffffff;
+  --color-dark-secondary: #a0a0a8;
+
+  /* Light mode */
+  --color-bg-light: #f5f5f7;
+  --color-surface-light: #ffffff;
+  --color-surface-light-elevated: #ffffff;
+  --color-border-light: #e5e5ea;
+  --color-light-primary: #0a0a0b;
+  --color-light-secondary: #6b7280;
+
+  /* Semânticas */
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+}
+
+@layer base {
+  body {
+    @apply bg-bg-light text-light-primary dark:bg-bg-dark dark:text-dark-primary;
+    @apply font-sans antialiased transition-colors duration-200;
+  }
+}
