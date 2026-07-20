@@ -8,12 +8,21 @@ import type { ImportTarget, ReviewedEntry } from './types'
 // Mesmo limite de operações por writeBatch já respeitado em resetUserData.ts.
 const BATCH_LIMIT = 500
 
-// Cria uma Transaction por entrada revisada (todas nascem `paid: true` —
-// já aconteceram de verdade) e, se o alvo for uma conta, aplica o saldo
-// resultante num único `increment()` atômico (soma de todos os efeitos
-// assinados) — não precisa de runTransaction/leitura prévia porque é um
-// delta simples, sem depender do saldo atual pra decidir o que escrever
-// (diferente de createTransaction, que decide com base em estado lido).
+// `paid` significa coisas diferentes pra conta e pra cartão (mesma
+// distinção de transactions/types.ts e invoiceUtils.ts/sumUnpaid): numa
+// conta, `paid: true` é o normal — o extrato importado já afetou o saldo
+// de verdade, então precisa entrar já refletido. Num cartão, `paid` só
+// vira `true` quando a fatura daquele período é PAGA (payCardInvoice) —
+// uma fatura importada representa cobranças ainda em aberto, então tem
+// que nascer `paid: false`, senão sumUnpaid() (o que soma o valor da
+// fatura) ignora essas linhas e a fatura não bate.
+//
+// Cria uma Transaction por entrada revisada e, se o alvo for uma conta,
+// aplica o saldo resultante num único `increment()` atômico (soma de
+// todos os efeitos assinados) — não precisa de runTransaction/leitura
+// prévia porque é um delta simples, sem depender do saldo atual pra
+// decidir o que escrever (diferente de createTransaction, que decide com
+// base em estado lido).
 export async function importTransactions(
   uid: string,
   entries: ReviewedEntry[],
@@ -42,7 +51,7 @@ export async function importTransactions(
         date: entry.date,
         description: entry.description,
         categoryId: entry.categoryId,
-        paid: true,
+        paid: accountId !== undefined,
         createdBy,
         ...(entry.installmentIndex !== undefined
           ? { installmentIndex: entry.installmentIndex, installmentTotal: entry.installmentTotal }
