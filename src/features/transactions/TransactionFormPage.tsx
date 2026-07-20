@@ -114,6 +114,11 @@ export function TransactionFormPage() {
     setFormError(null)
     const linkage =
       data.linkedType === 'account' ? { accountId: data.accountId } : { cardId: data.cardId }
+    // Defesa em profundidade: despesa de cartão só fica paga através do
+    // pagamento de fatura (payCardInvoice) — nunca na criação. Edição não
+    // entra aqui (o toggle já vem escondido pra card, `data.paid` reflete
+    // só o que já estava salvo).
+    const paidOnCreate = data.linkedType === 'card' ? false : data.paid
 
     try {
       if (transactionId) {
@@ -139,7 +144,7 @@ export function TransactionFormPage() {
             dayOfMonth: Number(data.date.slice(-2)),
             ...linkage,
           },
-          data.paid,
+          paidOnCreate,
         )
       } else if (data.recurrence === 'installments') {
         await createInstallmentExpense(
@@ -147,7 +152,7 @@ export function TransactionFormPage() {
           { amount: data.amount, description: data.description, categoryId: data.categoryId, date: data.date, ...linkage },
           data.installmentsCount ?? 2,
           data.installmentAmountMode === 'perInstallment',
-          data.paid,
+          paidOnCreate,
         )
       } else {
         const payload: TransactionFormData = {
@@ -156,7 +161,7 @@ export function TransactionFormPage() {
           date: data.date,
           description: data.description,
           categoryId: data.categoryId,
-          paid: data.paid,
+          paid: paidOnCreate,
           ...linkage,
         }
         await createTransaction(user.uid, payload)
@@ -306,7 +311,12 @@ export function TransactionFormPage() {
               </button>
               <button
                 type="button"
-                onClick={() => expenseForm.setValue('linkedType', 'card', { shouldValidate: true })}
+                onClick={() => {
+                  expenseForm.setValue('linkedType', 'card', { shouldValidate: true })
+                  // Despesa de cartão só fica paga através do pagamento de
+                  // fatura (payCardInvoice) — nunca marcada direto aqui.
+                  expenseForm.setValue('paid', false)
+                }}
                 className={cn(
                   'flex-1 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all duration-200',
                   linkedType === 'card'
@@ -344,19 +354,25 @@ export function TransactionFormPage() {
             </Select>
           )}
 
-          <button
-            type="button"
-            onClick={() => expenseForm.setValue('paid', !expensePaid)}
-            className={cn(
-              'flex items-center justify-between rounded-xl border px-4 py-2.5 text-sm font-medium transition-all duration-200',
-              expensePaid
-                ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
-            )}
-          >
-            Já foi paga?
-            <span>{expensePaid ? 'Sim' : 'Não'}</span>
-          </button>
+          {linkedType === 'account' ? (
+            <button
+              type="button"
+              onClick={() => expenseForm.setValue('paid', !expensePaid)}
+              className={cn(
+                'flex items-center justify-between rounded-xl border px-4 py-2.5 text-sm font-medium transition-all duration-200',
+                expensePaid
+                  ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                  : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+              )}
+            >
+              Já foi paga?
+              <span>{expensePaid ? 'Sim' : 'Não'}</span>
+            </button>
+          ) : (
+            <p className="text-sm text-light-secondary dark:text-dark-secondary">
+              Despesa de cartão só fica paga quando a fatura é paga.
+            </p>
+          )}
 
           {!isEditMode ? (
             <div className="flex flex-col gap-1.5">

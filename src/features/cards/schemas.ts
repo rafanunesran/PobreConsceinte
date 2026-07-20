@@ -18,3 +18,18 @@ export const cardSchema = z.object({
 })
 
 export type CardFormData = z.infer<typeof cardSchema>
+
+// Fábrica porque o teto (`owed`) muda a cada fatura — não dá pra fixar num
+// schema estático.
+export function buildPayInvoiceSchema(owed: number) {
+  return z.object({
+    amountPaid: z
+      .number('Informe um valor válido')
+      .positive('Informe um valor maior que zero')
+      .max(owed, 'O valor não pode ser maior que o valor da fatura'),
+    accountId: z.string().min(1, 'Selecione uma conta'),
+    categoryId: z.string().min(1, 'Selecione uma categoria'),
+  })
+}
+
+export type PayInvoiceFormData = z.infer<ReturnType<typeof buildPayInvoiceSchema>>

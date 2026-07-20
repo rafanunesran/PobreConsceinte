@@ -1,17 +1,52 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CreditCard as CreditCardIcon, Plus } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useCards } from './useCards'
-import { CARD_BRAND_LABELS } from './types'
-import { Card } from '../../components/ui/Card'
+import { useTransactions } from '../transactions/useTransactions'
+import { CardsTotalCard } from './CardsTotalCard'
+import { InvoicesSummaryCard, type InvoiceRow } from './InvoicesSummaryCard'
+import { CardTile } from './CardTile'
+import {
+  cardOccupiedLimit,
+  getInvoicePeriod,
+  previousInvoicePeriod,
+  sumUnpaid,
+  todayDateString,
+  transactionsInPeriod,
+} from './invoiceUtils'
 import { Button } from '../../components/ui/Button'
-import { formatBRL } from '../../lib/utils'
 
 export function CardsPage() {
   const user = useAuthStore((state) => state.user)
-  // NOTE: hooks não podem ser condicionais — chama useCards sempre, com uid
-  // vazio se `user` ainda não resolveu, e só corta a renderização depois.
+  // NOTE: hooks não podem ser condicionais — chama sempre, com uid vazio se
+  // `user` ainda não resolveu, e só corta a renderização depois.
   const { cards, loading, error } = useCards(user?.uid ?? '')
+  const { transactions } = useTransactions(user?.uid ?? '')
+  const [invoiceView, setInvoiceView] = useState<'aberta' | 'fechada'>('aberta')
+
+  const occupiedByCard = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const card of cards) map.set(card.id, cardOccupiedLimit(transactions, card.id))
+    return map
+  }, [cards, transactions])
+
+  const { totalLimit, totalOccupied, totalAvailable } = useMemo(() => {
+    const limit = cards.reduce((sum, card) => sum + card.limit, 0)
+    const occupied = cards.reduce((sum, card) => sum + (occupiedByCard.get(card.id) ?? 0), 0)
+    return { totalLimit: limit, totalOccupied: occupied, totalAvailable: limit - occupied }
+  }, [cards, occupiedByCard])
+
+  const { rows, invoicesTotal } = useMemo(() => {
+    const today = todayDateString()
+    const invoiceRows: InvoiceRow[] = cards.map((card) => {
+      const openPeriod = getInvoicePeriod(card.closingDay, today)
+      const period = invoiceView === 'aberta' ? openPeriod : previousInvoicePeriod(card.closingDay, openPeriod)
+      const owed = sumUnpaid(transactionsInPeriod(transactions, card.id, period))
+      return { cardId: card.id, cardName: card.name, periodOwed: owed }
+    })
+    return { rows: invoiceRows, invoicesTotal: invoiceRows.reduce((sum, row) => sum + row.periodOwed, 0) }
+  }, [cards, transactions, invoiceView])
 
   // Só renderiza atrás de <ProtectedRoute>, `user` nunca deveria ser null
   // aqui de verdade — o guard é só pro TS não reclamar.
@@ -58,25 +93,34 @@ export function CardsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => (
-            <Link key={card.id} to={`/cartoes/${card.id}/editar`}>
-              <Card className="transition-all duration-200 hover:border-brand-500">
-                <p className="text-sm text-light-secondary dark:text-dark-secondary">
-                  {CARD_BRAND_LABELS[card.brand]}
-                </p>
-                <p className="mt-1 font-medium text-light-primary dark:text-dark-primary">
-                  {card.name}
-                </p>
-                <p className="mt-3 text-xl font-semibold text-light-primary dark:text-dark-primary">
-                  {formatBRL(card.limit)}
-                </p>
-                <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">
-                  Fecha dia {card.closingDay}, vence dia {card.dueDay}
-                </p>
-              </Card>
-            </Link>
-          ))}
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <div className="lg:w-1/4">
+            <CardsTotalCard
+              totalLimit={totalLimit}
+              totalOccupied={totalOccupied}
+              totalAvailable={totalAvailable}
+            />
+          </div>
+
+          <div className="flex flex-col gap-6 lg:w-3/4">
+            <InvoicesSummaryCard
+              view={invoiceView}
+              onViewChange={setInvoiceView}
+              rows={rows}
+              total={invoicesTotal}
+            />
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {cards.map((card) => (
+                <CardTile
+                  key={card.id}
+                  card={card}
+                  occupied={occupiedByCard.get(card.id) ?? 0}
+                  available={card.limit - (occupiedByCard.get(card.id) ?? 0)}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
