@@ -39,10 +39,11 @@ export function CaixinhaAdjustPage() {
   }
 
   async function onSubmit(data: CaixinhaAdjustFormData) {
-    if (!user || !caixinhaId) return
+    if (!user || !caixinhaId || !caixinha) return
     setFormError(null)
+    const diff = roundToCents(data.realBalance - caixinha.balance)
     try {
-      await adjustCaixinhaBalance(user.uid, caixinhaId, data.realBalance)
+      await adjustCaixinhaBalance(user.uid, caixinhaId, data.realBalance, diff)
       navigate(`/contas/${accountId}`)
     } catch {
       setFormError('Não foi possível ajustar o saldo. Tente novamente.')

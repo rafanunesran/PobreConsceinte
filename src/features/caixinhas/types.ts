@@ -5,3 +5,23 @@ export interface Caixinha {
   balance: number
   yieldLabel?: string // só rótulo informativo, ex: "110% do CDI" — nunca calculado
 }
+
+export const CAIXINHA_MOVEMENT_TYPES = ['guardar', 'resgatar', 'rendimento', 'ajuste'] as const
+export type CaixinhaMovementType = (typeof CAIXINHA_MOVEMENT_TYPES)[number]
+
+export const CAIXINHA_MOVEMENT_LABELS: Record<CaixinhaMovementType, string> = {
+  guardar: 'Guardado',
+  resgatar: 'Resgatado',
+  rendimento: 'Rendimento',
+  ajuste: 'Ajuste de saldo',
+}
+
+// Log de histórico só pra exibição (extrato da caixinha) — nunca vira
+// Transaction, então não afeta despesas/receitas.
+export interface CaixinhaMovement {
+  id: string
+  caixinhaId: string
+  type: CaixinhaMovementType
+  amount: number // efeito assinado no saldo da caixinha: positivo aumenta, negativo diminui
+  date: string // 'YYYY-MM-DD'
+}

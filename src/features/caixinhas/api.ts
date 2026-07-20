@@ -4,11 +4,14 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  runTransaction,
   updateDoc,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
+import { todayDateString } from '../cards/invoiceUtils'
+import { caixinhaMovementsCollection } from './movements'
 import type { Caixinha } from './types'
 import type { CaixinhaFormData } from './schemas'
 
@@ -47,7 +50,15 @@ export async function createCaixinha(
   accountId: string,
   data: CaixinhaFormData,
 ): Promise<string> {
-  const ref = await addDoc(caixinhasCollection(uid), { id: '', accountId, balance: 0, ...data })
+  const ref = await addDoc(caixinhasCollection(uid), {
+    id: '',
+    accountId,
+    balance: 0,
+    name: data.name,
+    // string vazia (campo deixado em branco no form) vira "ausente" —
+    // não persiste um yieldLabel sem conteúdo.
+    ...(data.yieldLabel ? { yieldLabel: data.yieldLabel } : {}),
+  })
   return ref.id
 }
 
@@ -71,14 +82,28 @@ export async function getCaixinha(uid: string, caixinhaId: string): Promise<Caix
   return snapshot.exists() ? snapshot.data() : null
 }
 
-// Ajuste de saldo da caixinha: escrita direta, sem Transaction e sem
-// tocar `account.balance` — restrição explícita do usuário (corrigir um
-// desvio na caixinha não é receita, diferente do ajuste de conta/fatura,
-// que reconcilia contra uma fonte de verdade externa real).
+// Ajuste de saldo da caixinha: sem Transaction (o tipo `Transaction` de
+// receita/despesa) e sem tocar `account.balance` — restrição explícita do
+// usuário (corrigir um desvio na caixinha não é receita, diferente do
+// ajuste de conta/fatura, que reconcilia contra uma fonte de verdade
+// externa real). Ainda assim registra um `CaixinhaMovement` (o log de
+// extrato, não o ledger de despesas/receitas) pra aparecer no histórico.
 export async function adjustCaixinhaBalance(
   uid: string,
   caixinhaId: string,
   realBalance: number,
+  diff: number,
 ): Promise<void> {
-  await updateDoc(caixinhaDoc(uid, caixinhaId), { balance: realBalance })
+  if (diff === 0) return
+  const movementRef = doc(caixinhaMovementsCollection(uid))
+  await runTransaction(db, async (transaction) => {
+    transaction.update(caixinhaDoc(uid, caixinhaId), { balance: realBalance })
+    transaction.set(movementRef, {
+      id: movementRef.id,
+      caixinhaId,
+      type: 'ajuste',
+      amount: diff,
+      date: todayDateString(),
+    })
+  })
 }

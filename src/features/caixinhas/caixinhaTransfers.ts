@@ -1,18 +1,24 @@
-import { runTransaction } from 'firebase/firestore'
+import { doc, runTransaction } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 import { accountDoc } from '../accounts/api'
 import { createTransaction } from '../transactions/api'
 import { todayDateString } from '../cards/invoiceUtils'
 import { caixinhaDoc } from './api'
+import { caixinhaMovementsCollection } from './movements'
+import type { CaixinhaMovementType } from './types'
 
 // Guardar: tira da conta, põe na caixinha. NUNCA cria Transaction — é
 // transferência entre "bolsos" do mesmo patrimônio, não receita/despesa.
+// `movementType` default 'guardar', mas registerCaixinhaYield reaproveita
+// esta mesma transferência com 'rendimento' pra rotular certo no extrato.
 export async function depositToCaixinha(
   uid: string,
   accountId: string,
   caixinhaId: string,
   amount: number,
+  movementType: CaixinhaMovementType = 'guardar',
 ): Promise<void> {
+  const movementRef = doc(caixinhaMovementsCollection(uid))
   await runTransaction(db, async (transaction) => {
     const accountSnap = await transaction.get(accountDoc(uid, accountId))
     const caixinhaSnap = await transaction.get(caixinhaDoc(uid, caixinhaId))
@@ -20,6 +26,13 @@ export async function depositToCaixinha(
     if (!caixinhaSnap.exists()) throw new Error('Caixinha não encontrada.')
     transaction.update(accountDoc(uid, accountId), { balance: accountSnap.data().balance - amount })
     transaction.update(caixinhaDoc(uid, caixinhaId), { balance: caixinhaSnap.data().balance + amount })
+    transaction.set(movementRef, {
+      id: movementRef.id,
+      caixinhaId,
+      type: movementType,
+      amount,
+      date: todayDateString(),
+    })
   })
 }
 
@@ -31,6 +44,7 @@ export async function withdrawFromCaixinha(
   caixinhaId: string,
   amount: number,
 ): Promise<void> {
+  const movementRef = doc(caixinhaMovementsCollection(uid))
   await runTransaction(db, async (transaction) => {
     const accountSnap = await transaction.get(accountDoc(uid, accountId))
     const caixinhaSnap = await transaction.get(caixinhaDoc(uid, caixinhaId))
@@ -39,12 +53,20 @@ export async function withdrawFromCaixinha(
     if (caixinhaSnap.data().balance < amount) throw new Error('Saldo insuficiente na caixinha.')
     transaction.update(accountDoc(uid, accountId), { balance: accountSnap.data().balance + amount })
     transaction.update(caixinhaDoc(uid, caixinhaId), { balance: caixinhaSnap.data().balance - amount })
+    transaction.set(movementRef, {
+      id: movementRef.id,
+      caixinhaId,
+      type: 'resgatar',
+      amount: -amount,
+      date: todayDateString(),
+    })
   })
 }
 
 // Encerrar: devolve o saldo (se houver) pra conta e apaga a caixinha,
 // atomicamente — nunca perde dinheiro no fechamento (mesmo comportamento
-// de "Encerrar caixinha" do Nubank).
+// de "Encerrar caixinha" do Nubank). Não registra movimento — a caixinha
+// deixa de existir, não há mais extrato pra ver.
 export async function closeCaixinha(uid: string, accountId: string, caixinhaId: string): Promise<void> {
   await runTransaction(db, async (transaction) => {
     const accountSnap = await transaction.get(accountDoc(uid, accountId))
@@ -84,5 +106,5 @@ export async function registerCaixinhaYield(
     paid: true,
     accountId,
   })
-  await depositToCaixinha(uid, accountId, caixinhaId, amount)
+  await depositToCaixinha(uid, accountId, caixinhaId, amount, 'rendimento')
 }

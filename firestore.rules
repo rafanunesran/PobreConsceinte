@@ -31,6 +31,15 @@ service cloud.firestore {
         && request.resource.data.balance is number;
     }
 
+    match /users/{userId}/caixinhaMovements/{movementId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.caixinhaId is string
+        && request.resource.data.type in ['guardar', 'resgatar', 'rendimento', 'ajuste']
+        && request.resource.data.amount is number
+        && request.resource.data.date is string;
+    }
+
     match /users/{userId}/cards/{cardId} {
       allow read, delete: if request.auth != null && request.auth.uid == userId;
       allow create, update: if request.auth != null && request.auth.uid == userId

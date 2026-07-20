@@ -26,7 +26,11 @@ export function AccountDetailPage() {
   const { transactions } = useTransactions(user?.uid ?? '')
   const { categories } = useCategories(user?.uid ?? '')
   const { cards } = useCards(user?.uid ?? '')
-  const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(user?.uid ?? '', accountId ?? '')
+  const {
+    caixinhas,
+    loading: loadingCaixinhas,
+    error: caixinhasError,
+  } = useCaixinhas(user?.uid ?? '', accountId ?? '')
 
   const account = accounts.find((a) => a.id === accountId)
 
@@ -137,7 +141,12 @@ export function AccountDetailPage() {
               </Link>
             </div>
 
-            {loadingCaixinhas ? (
+            {caixinhasError ? (
+              <p className="text-sm text-danger">
+                Não foi possível carregar as caixinhas. Verifique se as regras do Firestore foram
+                publicadas.
+              </p>
+            ) : loadingCaixinhas ? (
               <div className="h-24 animate-pulse rounded-2xl border border-border-light bg-surface-light dark:border-border-dark dark:bg-surface-dark-elevated" />
             ) : caixinhas.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border-light py-6 text-center text-xs text-light-secondary dark:border-border-dark dark:text-dark-secondary">

@@ -125,6 +125,13 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'contas/:accountId/caixinhas/:caixinhaId',
+          lazy: async () => {
+            const { CaixinhaDetailPage } = await import('./features/caixinhas/CaixinhaDetailPage')
+            return { Component: CaixinhaDetailPage }
+          },
+        },
+        {
           path: 'contas/:accountId/caixinhas/:caixinhaId/transferir',
           lazy: async () => {
             const { CaixinhaTransferPage } = await import('./features/caixinhas/CaixinhaTransferPage')
