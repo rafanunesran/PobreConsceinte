@@ -54,7 +54,7 @@ export async function payCardInvoice(
     const accountSnap = await transaction.get(accountDoc(uid, params.accountId))
     if (!accountSnap.exists()) throw new Error('Conta vinculada não encontrada.')
 
-    const readTxs: { id: string; amount: number }[] = []
+    const readTxs: { id: string; amount: number; type: 'expense' | 'income' }[] = []
     for (const id of params.unpaidTransactionIds) {
       const snap = await transaction.get(transactionDoc(uid, id))
       if (!snap.exists()) {
@@ -67,10 +67,14 @@ export async function payCardInvoice(
       if (data.paid) {
         throw new Error('Uma das transações desta fatura já estava paga. Atualize a página e tente novamente.')
       }
-      readTxs.push({ id, amount: data.amount })
+      readTxs.push({ id, amount: data.amount, type: data.type })
     }
 
-    const owed = roundToCents(readTxs.reduce((sum, t) => sum + t.amount, 0))
+    // receita vinculada ao cartão é um crédito/ajuste — abate o valor
+    // devido em vez de somar.
+    const owed = roundToCents(
+      readTxs.reduce((sum, t) => sum + (t.type === 'expense' ? t.amount : -t.amount), 0),
+    )
     if (owed <= 0) throw new Error('Não há valor em aberto para pagar nesta fatura.')
     if (params.amountPaid > owed) throw new Error('O valor pago não pode ser maior que o valor da fatura.')
 

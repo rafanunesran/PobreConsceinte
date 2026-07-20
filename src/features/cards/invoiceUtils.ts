@@ -67,8 +67,15 @@ export function transactionsInPeriod(
   return transactions.filter((t) => t.cardId === cardId && t.date >= period.start && t.date <= period.end)
 }
 
+// Receita vinculada a cartão é um crédito/ajuste — abate o valor devido em
+// vez de somar, por isso netamos por `type` aqui.
 export function sumUnpaid(transactions: Transaction[]): number {
-  return roundToCents(transactions.reduce((sum, t) => (t.paid ? sum : sum + t.amount), 0))
+  return roundToCents(
+    transactions.reduce((sum, t) => {
+      if (t.paid) return sum
+      return t.type === 'expense' ? sum + t.amount : sum - t.amount
+    }, 0),
+  )
 }
 
 // "Ocupado": todas as despesas não-pagas do cartão, sem filtro de período —

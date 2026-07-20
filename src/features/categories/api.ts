@@ -42,8 +42,9 @@ function categoryDoc(uid: string, categoryId: string) {
   return doc(db, 'users', uid, 'categories', categoryId).withConverter(categoryConverter)
 }
 
-export async function createCategory(uid: string, data: CategoryFormData): Promise<void> {
-  await addDoc(categoriesCollection(uid), { id: '', ...data })
+export async function createCategory(uid: string, data: CategoryFormData): Promise<string> {
+  const ref = await addDoc(categoriesCollection(uid), { id: '', ...data })
+  return ref.id
 }
 
 export async function updateCategory(

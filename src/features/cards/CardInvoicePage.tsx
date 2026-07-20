@@ -32,6 +32,7 @@ export function CardInvoicePage() {
   const { transactions, loading: loadingTransactions } = useTransactions(user?.uid ?? '')
   const { categories } = useCategories(user?.uid ?? '')
   const [periodOffset, setPeriodOffset] = useState(0)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const card = cards.find((c) => c.id === cardId)
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -79,13 +80,37 @@ export function CardInvoicePage() {
           ) : null}
         </div>
         {card ? (
-          <Link
-            to={`/cartoes/${card.id}/editar`}
-            aria-label="Editar cartão"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
-          >
-            <Settings size={16} />
-          </Link>
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Mais opções"
+              onClick={() => setMenuOpen((open) => !open)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
+            >
+              <Settings size={16} />
+            </button>
+            {menuOpen ? (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-11 z-20 flex w-48 flex-col overflow-hidden rounded-xl border border-border-light bg-surface-light shadow-lg dark:border-border-dark dark:bg-surface-dark-elevated">
+                  <Link
+                    to={`/cartoes/${card.id}/editar`}
+                    onClick={() => setMenuOpen(false)}
+                    className="px-4 py-2.5 text-left text-sm text-light-primary transition-colors duration-200 hover:bg-border-light dark:text-dark-primary dark:hover:bg-border-dark"
+                  >
+                    Editar cartão
+                  </Link>
+                  <Link
+                    to={`/cartoes/${card.id}/fatura/ajustar?offset=${periodOffset}`}
+                    onClick={() => setMenuOpen(false)}
+                    className="px-4 py-2.5 text-left text-sm text-light-primary transition-colors duration-200 hover:bg-border-light dark:text-dark-primary dark:hover:bg-border-dark"
+                  >
+                    Ajuste de fatura
+                  </Link>
+                </div>
+              </>
+            ) : null}
+          </div>
         ) : null}
       </div>
 

@@ -55,6 +55,13 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'cartoes/:cardId/fatura/ajustar',
+          lazy: async () => {
+            const { AdjustInvoicePage } = await import('./features/cards/AdjustInvoicePage')
+            return { Component: AdjustInvoicePage }
+          },
+        },
+        {
           path: 'cartoes/:cardId/fatura/pagar',
           lazy: async () => {
             const { PayCardInvoicePage } = await import('./features/cards/PayCardInvoicePage')

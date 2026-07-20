@@ -83,13 +83,13 @@ export function signedEffect(type: TransactionType, amount: number): number {
 }
 
 // Defesa em profundidade — o zod do form já deveria garantir isso, mas a
-// api.ts não confia cegamente no caller.
+// api.ts não confia cegamente no caller. Receita vinculada a cartão é
+// válida (representa um crédito/ajuste que abate o valor da fatura, ver
+// cards/invoiceUtils.ts) — só o form geral de receita não expõe essa
+// opção; quem cria isso é o fluxo de ajuste de fatura.
 function assertValidLinkage(data: TransactionFormData): void {
   const hasAccount = data.accountId !== undefined
   const hasCard = data.cardId !== undefined
-  if (data.type === 'income' && hasCard) {
-    throw new Error('Receita não pode estar vinculada a um cartão.')
-  }
   if (hasAccount === hasCard) {
     throw new Error('A transação deve estar vinculada a exatamente uma conta ou um cartão.')
   }

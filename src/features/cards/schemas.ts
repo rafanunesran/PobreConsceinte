@@ -33,3 +33,10 @@ export function buildPayInvoiceSchema(owed: number) {
 }
 
 export type PayInvoiceFormData = z.infer<ReturnType<typeof buildPayInvoiceSchema>>
+
+export const adjustInvoiceSchema = z.object({
+  amount: z.number('Informe um valor válido').positive('Informe um valor maior que zero'),
+  type: z.enum(['expense', 'income'], 'Selecione o tipo'),
+})
+
+export type AdjustInvoiceFormData = z.infer<typeof adjustInvoiceSchema>

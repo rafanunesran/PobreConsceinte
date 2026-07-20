@@ -13,6 +13,8 @@ interface PendingTransactionCompactCardProps {
   category: Category | undefined
   confirming: boolean
   onConfirm: () => void
+  selected: boolean
+  onToggleSelect: () => void
 }
 
 export function PendingTransactionCompactCard({
@@ -20,12 +22,21 @@ export function PendingTransactionCompactCard({
   category,
   confirming,
   onConfirm,
+  selected,
+  onToggleSelect,
 }: PendingTransactionCompactCardProps) {
   const Icon = category ? CATEGORY_ICON_COMPONENTS[category.icon] : CircleDashed
 
   return (
     <Card className="flex flex-col gap-2 p-3">
       <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          aria-label="Selecionar"
+          checked={selected}
+          onChange={onToggleSelect}
+          className="h-4 w-4 shrink-0 accent-brand-500"
+        />
         <span
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
           style={{ backgroundColor: category?.color ?? '#6B7280' }}

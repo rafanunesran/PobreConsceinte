@@ -10,7 +10,7 @@ export interface Transaction {
   categoryId: string
   paid: boolean // controla se a transação afeta o saldo da conta vinculada
   accountId?: string // presente sse account-linked
-  cardId?: string // presente sse card-linked (só em expenses)
+  cardId?: string // presente sse card-linked (despesa normal ou receita como crédito/ajuste de fatura)
   recurringRuleId?: string // presente sse gerada por uma regra de recorrência fixa
   installmentGroupId?: string // presente sse parte de um parcelamento
   installmentIndex?: number // 1-based

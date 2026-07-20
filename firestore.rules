@@ -50,7 +50,7 @@ service cloud.firestore {
         && request.resource.data.paid is bool
         && (
           (request.resource.data.keys().hasAny(['accountId']) && !request.resource.data.keys().hasAny(['cardId']))
-          || (request.resource.data.keys().hasAny(['cardId']) && !request.resource.data.keys().hasAny(['accountId']) && request.resource.data.type == 'expense')
+          || (request.resource.data.keys().hasAny(['cardId']) && !request.resource.data.keys().hasAny(['accountId']))
         );
     }
 
