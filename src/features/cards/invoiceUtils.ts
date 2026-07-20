@@ -173,44 +173,43 @@ export function shiftInvoicePeriod(closingDay: number, period: InvoicePeriod, st
   return result
 }
 
-export interface CardInvoiceWindowEntry {
-  offset: number // relativo a HOJE (não à janela) — -1 sempre é a última fechada, 0 sempre é a aberta
+export interface CardInvoiceMonthEntry {
+  cardId: string
+  cardName: string
   periodEnd: string // 'YYYY-MM-DD' — pro caller formatar o nome do mês
-  status: 'closed' | 'open' | null
   amount: number
 }
 
-export interface CardInvoiceWindow {
-  cardId: string
-  cardName: string
-  entries: CardInvoiceWindowEntry[]
+export interface CardInvoiceMonth {
+  offset: number // relativo a HOJE — -1 é a última fatura fechada, 0 é a aberta
+  status: 'closed' | 'open' | null
+  entries: CardInvoiceMonthEntry[]
 }
 
-// Janela fixa de 5 faturas por cartão: a que fechou mais recentemente
-// (offset -1), a aberta (offset 0) e as 3 seguintes projetadas — desloca
-// inteira com `baseOffset` (as setas do InvoicesSummaryCard mudam isso),
-// mas `status` continua sempre relativo a HOJE, não à janela, então
-// "fechada"/"aberta" nunca aparecem em lugar errado mesmo com a janela
-// deslocada.
-export function computeInvoiceWindows(
+// Uma fatura por vez (todos os cartões juntos), no mesmo offset relativo a
+// hoje pra cada um — as setas do InvoicesSummaryCard mudam esse offset.
+// "Fechada"/"Aberta" vêm do offset em si, não de mês calendário, então
+// continuam corretas mesmo que os cartões tenham dia de fechamento
+// diferente entre si.
+export function computeInvoiceMonth(
   cards: CreditCard[],
   transactions: Transaction[],
-  baseOffset: number,
-): CardInvoiceWindow[] {
+  offset: number,
+): CardInvoiceMonth {
   const today = todayDateString()
-  const offsets = [-1, 0, 1, 2, 3].map((o) => o + baseOffset)
-
-  return cards.map((card) => {
+  const entries = cards.map((card) => {
     const openPeriod = getInvoicePeriod(card.closingDay, today)
-    const entries = offsets.map((offset) => {
-      const period = shiftInvoicePeriod(card.closingDay, openPeriod, offset)
-      return {
-        offset,
-        periodEnd: period.end,
-        status: offset === -1 ? ('closed' as const) : offset === 0 ? ('open' as const) : null,
-        amount: sumUnpaid(transactionsInPeriod(transactions, card.id, period)),
-      }
-    })
-    return { cardId: card.id, cardName: card.name, entries }
+    const period = shiftInvoicePeriod(card.closingDay, openPeriod, offset)
+    return {
+      cardId: card.id,
+      cardName: card.name,
+      periodEnd: period.end,
+      amount: sumUnpaid(transactionsInPeriod(transactions, card.id, period)),
+    }
   })
+  return {
+    offset,
+    status: offset === -1 ? 'closed' : offset === 0 ? 'open' : null,
+    entries,
+  }
 }

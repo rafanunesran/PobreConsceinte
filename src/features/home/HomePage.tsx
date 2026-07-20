@@ -9,7 +9,7 @@ import { BalanceteCard } from '../transactions/BalanceteCard'
 import { currentYearMonth } from '../transactions/dateUtils'
 import { useCards } from '../cards/useCards'
 import { InvoicesSummaryCard } from '../cards/InvoicesSummaryCard'
-import { computeInvoiceWindows } from '../cards/invoiceUtils'
+import { computeInvoiceMonth } from '../cards/invoiceUtils'
 import { MonthSelector } from '../../components/ui/MonthSelector'
 import { formatBRL } from '../../lib/utils'
 
@@ -27,11 +27,11 @@ export function HomePage() {
   const { transactions } = useTransactions(workspaceId ?? '')
   const { cards } = useCards(workspaceId ?? '')
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
-  const [invoiceBaseOffset, setInvoiceBaseOffset] = useState(0)
+  const [invoiceOffset, setInvoiceOffset] = useState(-1)
 
-  const invoiceWindows = useMemo(
-    () => computeInvoiceWindows(cards, transactions, invoiceBaseOffset),
-    [cards, transactions, invoiceBaseOffset],
+  const invoiceMonth = useMemo(
+    () => computeInvoiceMonth(cards, transactions, invoiceOffset),
+    [cards, transactions, invoiceOffset],
   )
   const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards])
 
@@ -68,11 +68,7 @@ export function HomePage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <BalanceteCard transactions={transactions} selectedMonth={selectedMonth} cardsById={cardsById} />
-        <InvoicesSummaryCard
-          baseOffset={invoiceBaseOffset}
-          onBaseOffsetChange={setInvoiceBaseOffset}
-          windows={invoiceWindows}
-        />
+        <InvoicesSummaryCard offset={invoiceOffset} onOffsetChange={setInvoiceOffset} month={invoiceMonth} />
       </div>
     </div>
   )
