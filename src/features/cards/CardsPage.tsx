@@ -5,16 +5,9 @@ import { useAuthStore } from '../../stores/authStore'
 import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
 import { CardsTotalCard } from './CardsTotalCard'
-import { InvoicesSummaryCard, type InvoiceRow } from './InvoicesSummaryCard'
+import { InvoicesSummaryCard } from './InvoicesSummaryCard'
 import { CardTile } from './CardTile'
-import {
-  cardOccupiedLimit,
-  getInvoicePeriod,
-  previousInvoicePeriod,
-  sumUnpaid,
-  todayDateString,
-  transactionsInPeriod,
-} from './invoiceUtils'
+import { cardOccupiedLimit, computeInvoiceRows } from './invoiceUtils'
 import { Button } from '../../components/ui/Button'
 
 export function CardsPage() {
@@ -23,7 +16,7 @@ export function CardsPage() {
   // `user` ainda não resolveu, e só corta a renderização depois.
   const { cards, loading, error } = useCards(user?.uid ?? '')
   const { transactions } = useTransactions(user?.uid ?? '')
-  const [invoiceView, setInvoiceView] = useState<'aberta' | 'fechada'>('aberta')
+  const [periodOffset, setPeriodOffset] = useState(0)
 
   const occupiedByCard = useMemo(() => {
     const map = new Map<string, number>()
@@ -37,16 +30,10 @@ export function CardsPage() {
     return { totalLimit: limit, totalOccupied: occupied, totalAvailable: limit - occupied }
   }, [cards, occupiedByCard])
 
-  const { rows, invoicesTotal } = useMemo(() => {
-    const today = todayDateString()
-    const invoiceRows: InvoiceRow[] = cards.map((card) => {
-      const openPeriod = getInvoicePeriod(card.closingDay, today)
-      const period = invoiceView === 'aberta' ? openPeriod : previousInvoicePeriod(card.closingDay, openPeriod)
-      const owed = sumUnpaid(transactionsInPeriod(transactions, card.id, period))
-      return { cardId: card.id, cardName: card.name, periodOwed: owed }
-    })
-    return { rows: invoiceRows, invoicesTotal: invoiceRows.reduce((sum, row) => sum + row.periodOwed, 0) }
-  }, [cards, transactions, invoiceView])
+  const { rows, total: invoicesTotal } = useMemo(
+    () => computeInvoiceRows(cards, transactions, periodOffset),
+    [cards, transactions, periodOffset],
+  )
 
   // Só renderiza atrás de <ProtectedRoute>, `user` nunca deveria ser null
   // aqui de verdade — o guard é só pro TS não reclamar.
@@ -104,13 +91,13 @@ export function CardsPage() {
 
           <div className="flex flex-col gap-6 lg:w-3/4">
             <InvoicesSummaryCard
-              view={invoiceView}
-              onViewChange={setInvoiceView}
+              periodOffset={periodOffset}
+              onPeriodOffsetChange={setPeriodOffset}
               rows={rows}
               total={invoicesTotal}
             />
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {cards.map((card) => (
                 <CardTile
                   key={card.id}

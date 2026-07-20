@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, Receipt, Settings } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Receipt, Settings } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
@@ -11,14 +11,14 @@ import { TransactionCompactCard } from '../transactions/TransactionCompactCard'
 import {
   getDueDate,
   getInvoicePeriod,
-  previousInvoicePeriod,
+  shiftInvoicePeriod,
   sumUnpaid,
   todayDateString,
   transactionsInPeriod,
 } from './invoiceUtils'
 import { CARD_BRAND_LABELS } from './types'
 import { Button } from '../../components/ui/Button'
-import { cn, formatBRL } from '../../lib/utils'
+import { formatBRL } from '../../lib/utils'
 
 function formatDisplayDate(date: string): string {
   return format(new Date(`${date}T00:00:00`), "d 'de' MMM", { locale: ptBR })
@@ -31,7 +31,7 @@ export function CardInvoicePage() {
   const { cards, loading: loadingCards } = useCards(user?.uid ?? '')
   const { transactions, loading: loadingTransactions } = useTransactions(user?.uid ?? '')
   const { categories } = useCategories(user?.uid ?? '')
-  const [invoiceView, setInvoiceView] = useState<'aberta' | 'fechada'>('aberta')
+  const [periodOffset, setPeriodOffset] = useState(0)
 
   const card = cards.find((c) => c.id === cardId)
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -39,8 +39,8 @@ export function CardInvoicePage() {
   const period = useMemo(() => {
     if (!card) return null
     const openPeriod = getInvoicePeriod(card.closingDay, todayDateString())
-    return invoiceView === 'aberta' ? openPeriod : previousInvoicePeriod(card.closingDay, openPeriod)
-  }, [card, invoiceView])
+    return shiftInvoicePeriod(card.closingDay, openPeriod, periodOffset)
+  }, [card, periodOffset])
 
   const periodTransactions = useMemo(() => {
     if (!card || !period) return []
@@ -94,28 +94,28 @@ export function CardInvoicePage() {
       ) : (
         <>
           <div className="flex flex-col gap-4 rounded-2xl border border-border-light bg-surface-light p-4 dark:border-border-dark dark:bg-gradient-to-b dark:from-surface-dark dark:to-surface-dark-elevated">
-            <div className="flex gap-2">
-              {(['aberta', 'fechada'] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setInvoiceView(option)}
-                  className={cn(
-                    'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium capitalize transition-all duration-200',
-                    invoiceView === option
-                      ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                      : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
-                  )}
-                >
-                  {option}
-                </button>
-              ))}
+            <div className="flex items-center justify-center gap-4">
+              <button
+                type="button"
+                aria-label="Fatura anterior"
+                onClick={() => setPeriodOffset((offset) => offset - 1)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <p className="text-sm text-light-secondary dark:text-dark-secondary">
+                {formatDisplayDate(period.start)} até {formatDisplayDate(period.end)}
+                {dueDate ? ` · vence ${formatDisplayDate(dueDate)}` : ''}
+              </p>
+              <button
+                type="button"
+                aria-label="Próxima fatura"
+                onClick={() => setPeriodOffset((offset) => offset + 1)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
+              >
+                <ChevronRight size={18} />
+              </button>
             </div>
-
-            <p className="text-sm text-light-secondary dark:text-dark-secondary">
-              {formatDisplayDate(period.start)} até {formatDisplayDate(period.end)}
-              {dueDate ? ` · vence ${formatDisplayDate(dueDate)}` : ''}
-            </p>
 
             <div>
               <p className="text-sm text-light-secondary dark:text-dark-secondary">Valor da fatura</p>
@@ -124,8 +124,8 @@ export function CardInvoicePage() {
               </p>
             </div>
 
-            {owed > 0 ? (
-              <Link to={`/cartoes/${card.id}/fatura/pagar?period=${invoiceView}`}>
+            {periodOffset <= 0 && owed > 0 ? (
+              <Link to={`/cartoes/${card.id}/fatura/pagar?offset=${periodOffset}`}>
                 <Button type="button" className="w-full">
                   Pagar
                 </Button>

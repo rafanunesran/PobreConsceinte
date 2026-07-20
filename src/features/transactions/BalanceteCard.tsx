@@ -28,32 +28,32 @@ export function BalanceteCard({ transactions, selectedMonth }: BalanceteCardProp
         Balancete do mês
       </p>
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
+        <div className="min-w-0">
           <p className="text-light-secondary dark:text-dark-secondary">Recebido</p>
-          <p className="font-semibold text-brand-500">{formatBRL(balancete.recebido)}</p>
+          <p className="truncate font-semibold text-brand-500">{formatBRL(balancete.recebido)}</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-light-secondary dark:text-dark-secondary">Pago</p>
-          <p className="font-semibold text-danger">{formatBRL(balancete.pago)}</p>
+          <p className="truncate font-semibold text-danger">{formatBRL(balancete.pago)}</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-light-secondary dark:text-dark-secondary">A receber</p>
-          <p className="font-semibold text-light-primary dark:text-dark-primary">
+          <p className="truncate font-semibold text-light-primary dark:text-dark-primary">
             {formatBRL(balancete.aReceber)}
           </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-light-secondary dark:text-dark-secondary">A pagar</p>
-          <p className="font-semibold text-light-primary dark:text-dark-primary">
+          <p className="truncate font-semibold text-light-primary dark:text-dark-primary">
             {formatBRL(balancete.aPagar)}
           </p>
         </div>
       </div>
-      <div className="border-t border-border-light pt-3 dark:border-border-dark">
+      <div className="min-w-0 border-t border-border-light pt-3 dark:border-border-dark">
         <p className="text-light-secondary dark:text-dark-secondary">Resultado</p>
         <p
           className={cn(
-            'text-lg font-semibold',
+            'truncate text-lg font-semibold',
             balancete.resultado >= 0 ? 'text-brand-500' : 'text-danger',
           )}
         >

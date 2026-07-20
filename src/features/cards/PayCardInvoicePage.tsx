@@ -12,7 +12,7 @@ import { payCardInvoice } from './invoicePayment'
 import {
   getInvoicePeriod,
   nextInvoicePeriod,
-  previousInvoicePeriod,
+  shiftInvoicePeriod,
   sumUnpaid,
   todayDateString,
   transactionsInPeriod,
@@ -25,7 +25,7 @@ export function PayCardInvoicePage() {
   const navigate = useNavigate()
   const { cardId } = useParams<{ cardId: string }>()
   const [searchParams] = useSearchParams()
-  const invoiceView = searchParams.get('period') === 'fechada' ? 'fechada' : 'aberta'
+  const periodOffset = Number(searchParams.get('offset')) || 0
   const user = useAuthStore((state) => state.user)
 
   const { cards, loading: loadingCards } = useCards(user?.uid ?? '')
@@ -41,8 +41,8 @@ export function PayCardInvoicePage() {
   const period = useMemo(() => {
     if (!card) return null
     const openPeriod = getInvoicePeriod(card.closingDay, todayDateString())
-    return invoiceView === 'aberta' ? openPeriod : previousInvoicePeriod(card.closingDay, openPeriod)
-  }, [card, invoiceView])
+    return shiftInvoicePeriod(card.closingDay, openPeriod, periodOffset)
+  }, [card, periodOffset])
 
   const unpaidPeriodTransactions = useMemo(() => {
     if (!card || !period) return []

@@ -1,43 +1,53 @@
 import { Link } from 'react-router-dom'
-import { CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-import { cn, formatBRL } from '../../lib/utils'
-
-export interface InvoiceRow {
-  cardId: string
-  cardName: string
-  periodOwed: number
-}
+import { formatBRL } from '../../lib/utils'
+import type { CardInvoiceRow } from './invoiceUtils'
 
 interface InvoicesSummaryCardProps {
-  view: 'aberta' | 'fechada'
-  onViewChange: (view: 'aberta' | 'fechada') => void
-  rows: InvoiceRow[]
+  periodOffset: number
+  onPeriodOffsetChange: (offset: number) => void
+  rows: CardInvoiceRow[]
   total: number
 }
 
-export function InvoicesSummaryCard({ view, onViewChange, rows, total }: InvoicesSummaryCardProps) {
+function offsetLabel(offset: number): string {
+  if (offset === 0) return 'Fatura atual'
+  if (offset < 0) return `${-offset} fatura${offset < -1 ? 's' : ''} atrás`
+  return `Em ${offset} fatura${offset > 1 ? 's' : ''}`
+}
+
+export function InvoicesSummaryCard({
+  periodOffset,
+  onPeriodOffsetChange,
+  rows,
+  total,
+}: InvoicesSummaryCardProps) {
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-light-primary dark:text-dark-primary">Faturas</p>
-        <div className="flex gap-2">
-          {(['aberta', 'fechada'] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onViewChange(option)}
-              className={cn(
-                'rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200',
-                view === option
-                  ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                  : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
-              )}
-            >
-              {option}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Fatura anterior"
+            onClick={() => onPeriodOffsetChange(periodOffset - 1)}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <span className="min-w-[7rem] text-center text-xs text-light-secondary dark:text-dark-secondary">
+            {offsetLabel(periodOffset)}
+          </span>
+          <button
+            type="button"
+            aria-label="Próxima fatura"
+            onClick={() => onPeriodOffsetChange(periodOffset + 1)}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
+          >
+            <ChevronRight size={14} />
+          </button>
         </div>
       </div>
 
@@ -60,18 +70,18 @@ export function InvoicesSummaryCard({ view, onViewChange, rows, total }: Invoice
                   {formatBRL(row.periodOwed)}
                 </p>
               </div>
-              {row.periodOwed > 0 ? (
-                <Link to={`/cartoes/${row.cardId}/fatura/pagar?period=${view}`}>
+              {periodOffset <= 0 && row.periodOwed > 0 ? (
+                <Link to={`/cartoes/${row.cardId}/fatura/pagar?offset=${periodOffset}`}>
                   <Button type="button" variant="secondary" className="shrink-0 px-3 py-1.5 text-xs">
                     Pagar
                   </Button>
                 </Link>
-              ) : (
+              ) : periodOffset <= 0 ? (
                 <span className="flex shrink-0 items-center gap-1 text-xs text-brand-500">
                   <CheckCircle2 size={14} />
                   Em dia
                 </span>
-              )}
+              ) : null}
             </div>
           ))}
         </div>

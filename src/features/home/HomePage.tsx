@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, MoreHorizontal, Plus, Receipt } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
@@ -6,6 +6,9 @@ import { useAccounts } from '../accounts/useAccounts'
 import { useTransactions } from '../transactions/useTransactions'
 import { BalanceteCard } from '../transactions/BalanceteCard'
 import { currentYearMonth } from '../transactions/dateUtils'
+import { useCards } from '../cards/useCards'
+import { InvoicesSummaryCard } from '../cards/InvoicesSummaryCard'
+import { computeInvoiceRows } from '../cards/invoiceUtils'
 import { MonthSelector } from '../../components/ui/MonthSelector'
 import { formatBRL } from '../../lib/utils'
 
@@ -20,7 +23,14 @@ export function HomePage() {
   const user = useAuthStore((state) => state.user)
   const { accounts, loading } = useAccounts(user?.uid ?? '')
   const { transactions } = useTransactions(user?.uid ?? '')
+  const { cards } = useCards(user?.uid ?? '')
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
+  const [invoicePeriodOffset, setInvoicePeriodOffset] = useState(0)
+
+  const { rows: invoiceRows, total: invoicesTotal } = useMemo(
+    () => computeInvoiceRows(cards, transactions, invoicePeriodOffset),
+    [cards, transactions, invoicePeriodOffset],
+  )
 
   if (!user) return null
 
@@ -51,7 +61,15 @@ export function HomePage() {
 
       <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
 
-      <BalanceteCard transactions={transactions} selectedMonth={selectedMonth} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <BalanceteCard transactions={transactions} selectedMonth={selectedMonth} />
+        <InvoicesSummaryCard
+          periodOffset={invoicePeriodOffset}
+          onPeriodOffsetChange={setInvoicePeriodOffset}
+          rows={invoiceRows}
+          total={invoicesTotal}
+        />
+      </div>
     </div>
   )
 }

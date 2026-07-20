@@ -1,5 +1,6 @@
 import { addMonthsClamped, formatDate, parseDate, roundToCents } from '../transactions/dateUtils'
 import type { Transaction } from '../transactions/types'
+import type { CreditCard } from './types'
 
 export interface InvoicePeriod {
   start: string // 'YYYY-MM-DD', inclusive
@@ -74,4 +75,42 @@ export function sumUnpaid(transactions: Transaction[]): number {
 // um retrato ao vivo do quanto do limite está comprometido.
 export function cardOccupiedLimit(transactions: Transaction[], cardId: string): number {
   return sumUnpaid(transactions.filter((t) => t.cardId === cardId))
+}
+
+// steps positivo = avança N faturas (projeção), negativo = volta N faturas.
+export function shiftInvoicePeriod(closingDay: number, period: InvoicePeriod, steps: number): InvoicePeriod {
+  let result = period
+  if (steps > 0) {
+    for (let i = 0; i < steps; i++) result = nextInvoicePeriod(closingDay, result)
+  } else {
+    for (let i = 0; i < -steps; i++) result = previousInvoicePeriod(closingDay, result)
+  }
+  return result
+}
+
+export interface CardInvoiceRow {
+  cardId: string
+  cardName: string
+  periodOwed: number
+}
+
+// offset=0 é a fatura aberta de cada cartão (hoje) — usado tanto na página
+// de Cartões quanto na Home, que mostram a mesma lista agregada em lugares
+// diferentes; centralizado aqui pra não duplicar a lógica.
+export function computeInvoiceRows(
+  cards: CreditCard[],
+  transactions: Transaction[],
+  periodOffset: number,
+): { rows: CardInvoiceRow[]; total: number } {
+  const today = todayDateString()
+  const rows = cards.map((card) => {
+    const openPeriod = getInvoicePeriod(card.closingDay, today)
+    const period = shiftInvoicePeriod(card.closingDay, openPeriod, periodOffset)
+    return {
+      cardId: card.id,
+      cardName: card.name,
+      periodOwed: sumUnpaid(transactionsInPeriod(transactions, card.id, period)),
+    }
+  })
+  return { rows, total: rows.reduce((sum, row) => sum + row.periodOwed, 0) }
 }
