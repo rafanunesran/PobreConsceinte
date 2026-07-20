@@ -35,10 +35,13 @@ export function CardInvoiceRowCard({ group }: CardInvoiceRowCardProps) {
             Vence {formatDisplayDate(group.dueDate)}
           </p>
           <p
-            className={cn('text-sm font-semibold', group.amount >= 0 ? 'text-danger' : 'text-brand-500')}
+            className={cn(
+              'text-sm font-semibold',
+              group.unpaidAmount >= 0 ? 'text-danger' : 'text-brand-500',
+            )}
           >
-            {group.amount >= 0 ? '-' : '+'}
-            {formatBRL(Math.abs(group.amount))}
+            {group.unpaidAmount >= 0 ? '-' : '+'}
+            {formatBRL(Math.abs(group.unpaidAmount))}
           </p>
         </div>
       </Card>

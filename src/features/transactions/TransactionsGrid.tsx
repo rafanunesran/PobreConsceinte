@@ -90,14 +90,18 @@ export function TransactionsGrid({
     // Agrupa TODAS as transações de cartão primeiro (sem filtrar por mês da
     // compra) e só então filtra pelo mês de VENCIMENTO — uma compra feita
     // depois do fechamento vence no mês seguinte, não no mês da compra.
+    // Só o que ainda está em aberto (unpaidAmount) entra aqui: uma fatura
+    // já paga tem sua própria transação "Pagamento fatura X" (vinculada à
+    // conta, aparece na listagem individual abaixo) — mostrar o total
+    // histórico aqui TAMBÉM duplicaria esse valor no extrato.
     const allGroups = groupCardTransactionsByInvoice(transactions, cards)
-    const groupsOfMonth = allGroups.filter((g) => g.dueMonth === selectedMonth)
+    const groupsOfMonth = allGroups.filter((g) => g.dueMonth === selectedMonth && g.unpaidAmount !== 0)
 
     return {
       expenses: ofMonth.filter((t) => t.type === 'expense'),
       incomes: ofMonth.filter((t) => t.type === 'income'),
-      expenseGroups: groupsOfMonth.filter((g) => g.amount >= 0),
-      incomeGroups: groupsOfMonth.filter((g) => g.amount < 0),
+      expenseGroups: groupsOfMonth.filter((g) => g.unpaidAmount > 0),
+      incomeGroups: groupsOfMonth.filter((g) => g.unpaidAmount < 0),
     }
   }, [transactions, selectedMonth, cards])
 

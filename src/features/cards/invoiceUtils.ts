@@ -84,16 +84,6 @@ export function cardOccupiedLimit(transactions: Transaction[], cardId: string): 
   return sumUnpaid(transactions.filter((t) => t.cardId === cardId))
 }
 
-// Diferente de sumUnpaid: soma TODAS as transações do período, pagas ou
-// não — representa o valor total histórico daquela fatura, não "quanto
-// ainda falta pagar". Uma fatura já paga (tudo com paid:true) precisa
-// continuar mostrando o total que ela teve, não R$ 0,00.
-function sumInvoiceTotal(transactions: Transaction[]): number {
-  return roundToCents(
-    transactions.reduce((sum, t) => (t.type === 'expense' ? sum + t.amount : sum - t.amount), 0),
-  )
-}
-
 export interface CardInvoiceGroup {
   cardId: string
   cardName: string
@@ -101,8 +91,11 @@ export interface CardInvoiceGroup {
   dueDate: string
   dueMonth: string // 'YYYY-MM' — mês de vencimento, usado pra agrupar no extrato
   periodOffset: number // relativo à fatura aberta de hoje (0), pra linkar direto pra CardInvoicePage
-  amount: number // total histórico do período (pago ou não) — ver sumInvoiceTotal
-  unpaidAmount: number // só o que ainda está em aberto — ver sumUnpaid
+  // Só o que ainda está em aberto (sumUnpaid) — nunca o total histórico.
+  // Uma fatura paga já tem sua própria transação "Pagamento fatura X"
+  // (vinculada à conta) representando esse valor; somar de novo aqui
+  // duplicaria o mesmo dinheiro em dois lugares do extrato.
+  unpaidAmount: number
 }
 
 // Agrupa transações de cartão por fatura (cartão + período de fechamento)
@@ -151,7 +144,6 @@ export function groupCardTransactionsByInvoice(
       dueDate: g.dueDate,
       dueMonth: g.dueDate.slice(0, 7),
       periodOffset: monthsBetween(openPeriod.end, g.period.end),
-      amount: sumInvoiceTotal(g.items),
       unpaidAmount: sumUnpaid(g.items),
     }
   })
