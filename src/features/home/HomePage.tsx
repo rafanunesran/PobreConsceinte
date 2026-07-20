@@ -10,6 +10,8 @@ import { currentYearMonth } from '../transactions/dateUtils'
 import { useCards } from '../cards/useCards'
 import { InvoicesSummaryCard } from '../cards/InvoicesSummaryCard'
 import { computeInvoiceMonth } from '../cards/invoiceUtils'
+import { useCategories } from '../categories/useCategories'
+import { CategorySpendingCard } from '../categories/CategorySpendingCard'
 import { MonthSelector } from '../../components/ui/MonthSelector'
 import { formatBRL } from '../../lib/utils'
 
@@ -26,6 +28,7 @@ export function HomePage() {
   const { accounts, loading } = useAccounts(workspaceId ?? '')
   const { transactions } = useTransactions(workspaceId ?? '')
   const { cards } = useCards(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
   const [invoiceOffset, setInvoiceOffset] = useState(-1)
 
@@ -70,6 +73,13 @@ export function HomePage() {
         <BalanceteCard transactions={transactions} selectedMonth={selectedMonth} cardsById={cardsById} />
         <InvoicesSummaryCard offset={invoiceOffset} onOffsetChange={setInvoiceOffset} month={invoiceMonth} />
       </div>
+
+      <CategorySpendingCard
+        transactions={transactions}
+        categories={categories}
+        cardsById={cardsById}
+        selectedMonth={selectedMonth}
+      />
     </div>
   )
 }
