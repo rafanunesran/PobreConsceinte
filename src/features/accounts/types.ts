@@ -14,4 +14,5 @@ export interface Account {
   type: AccountType
   balance: number
   currency: 'BRL'
+  includeInTotal: boolean // false = fica fora da somatória do Home
 }

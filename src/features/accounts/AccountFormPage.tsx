@@ -9,6 +9,7 @@ import { Select } from '../../components/ui/Select'
 import { accountSchema, type AccountFormData } from './schemas'
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABELS } from './types'
 import { createAccount, deleteAccount, getAccount, updateAccount } from './api'
+import { useCaixinhas } from '../caixinhas/useCaixinhas'
 
 export function AccountFormPage() {
   const navigate = useNavigate()
@@ -21,10 +22,14 @@ export function AccountFormPage() {
   const [loadError, setLoadError] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Só precisa da lista pra checar "tem alguma?" antes de excluir — a
+  // conta só pode ser removida com segurança depois que todas as
+  // caixinhas foram encerradas (encerrar sempre devolve o saldo).
+  const { caixinhas } = useCaixinhas(user?.uid ?? '', accountId ?? '')
 
   const form = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
-    defaultValues: { name: '', type: 'corrente', balance: 0 },
+    defaultValues: { name: '', type: 'corrente', balance: 0, includeInTotal: true },
   })
 
   useEffect(() => {
@@ -37,7 +42,12 @@ export function AccountFormPage() {
           navigate('/contas', { replace: true })
           return
         }
-        form.reset({ name: account.name, type: account.type, balance: account.balance })
+        form.reset({
+          name: account.name,
+          type: account.type,
+          balance: account.balance,
+          includeInTotal: account.includeInTotal,
+        })
         setIsLoadingAccount(false)
       })
       .catch(() => {
@@ -129,6 +139,15 @@ export function AccountFormPage() {
           {...form.register('balance', { valueAsNumber: true })}
         />
 
+        <label className="flex items-center gap-2 text-sm text-light-primary dark:text-dark-primary">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-brand-500"
+            {...form.register('includeInTotal')}
+          />
+          Incluir na somatória do dashboard
+        </label>
+
         {formError ? <p className="text-sm text-danger">{formError}</p> : null}
 
         <Button type="submit" disabled={form.formState.isSubmitting}>
@@ -138,7 +157,11 @@ export function AccountFormPage() {
 
       {isEditMode ? (
         <div className="border-t border-border-light pt-4 dark:border-border-dark">
-          {confirmingDelete ? (
+          {caixinhas.length > 0 ? (
+            <p className="text-sm text-light-secondary dark:text-dark-secondary">
+              Encerre as caixinhas desta conta antes de excluí-la.
+            </p>
+          ) : confirmingDelete ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-light-secondary dark:text-dark-secondary">
                 Tem certeza? Essa ação não pode ser desfeita.

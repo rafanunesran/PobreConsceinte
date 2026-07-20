@@ -90,6 +90,55 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'contas/:accountId',
+          lazy: async () => {
+            const { AccountDetailPage } = await import('./features/accounts/AccountDetailPage')
+            return { Component: AccountDetailPage }
+          },
+        },
+        {
+          path: 'contas/:accountId/ajustar',
+          lazy: async () => {
+            const { AdjustAccountBalancePage } = await import('./features/accounts/AdjustAccountBalancePage')
+            return { Component: AdjustAccountBalancePage }
+          },
+        },
+        {
+          path: 'contas/:accountId/caixinhas/nova',
+          lazy: async () => {
+            const { CaixinhaFormPage } = await import('./features/caixinhas/CaixinhaFormPage')
+            return { Component: CaixinhaFormPage }
+          },
+        },
+        {
+          path: 'contas/:accountId/caixinhas/:caixinhaId/editar',
+          lazy: async () => {
+            const { CaixinhaFormPage } = await import('./features/caixinhas/CaixinhaFormPage')
+            return { Component: CaixinhaFormPage }
+          },
+        },
+        {
+          path: 'contas/:accountId/caixinhas/:caixinhaId/transferir',
+          lazy: async () => {
+            const { CaixinhaTransferPage } = await import('./features/caixinhas/CaixinhaTransferPage')
+            return { Component: CaixinhaTransferPage }
+          },
+        },
+        {
+          path: 'contas/:accountId/caixinhas/:caixinhaId/rendimento',
+          lazy: async () => {
+            const { CaixinhaYieldPage } = await import('./features/caixinhas/CaixinhaYieldPage')
+            return { Component: CaixinhaYieldPage }
+          },
+        },
+        {
+          path: 'contas/:accountId/caixinhas/:caixinhaId/ajustar',
+          lazy: async () => {
+            const { CaixinhaAdjustPage } = await import('./features/caixinhas/CaixinhaAdjustPage')
+            return { Component: CaixinhaAdjustPage }
+          },
+        },
+        {
           path: 'categorias',
           lazy: async () => {
             const { CategoriesPage } = await import('./features/categories/CategoriesPage')

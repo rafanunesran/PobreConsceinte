@@ -2,10 +2,8 @@ import { Link } from 'react-router-dom'
 import { Plus, Wallet } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useAccounts } from './useAccounts'
-import { ACCOUNT_TYPE_LABELS } from './types'
-import { Card } from '../../components/ui/Card'
+import { AccountTile } from './AccountTile'
 import { Button } from '../../components/ui/Button'
-import { formatBRL } from '../../lib/utils'
 
 export function AccountsPage() {
   const user = useAuthStore((state) => state.user)
@@ -60,19 +58,7 @@ export function AccountsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => (
-            <Link key={account.id} to={`/contas/${account.id}/editar`}>
-              <Card className="transition-all duration-200 hover:border-brand-500">
-                <p className="text-sm text-light-secondary dark:text-dark-secondary">
-                  {ACCOUNT_TYPE_LABELS[account.type]}
-                </p>
-                <p className="mt-1 font-medium text-light-primary dark:text-dark-primary">
-                  {account.name}
-                </p>
-                <p className="mt-3 text-xl font-semibold text-light-primary dark:text-dark-primary">
-                  {formatBRL(account.balance)}
-                </p>
-              </Card>
-            </Link>
+            <AccountTile key={account.id} account={account} />
           ))}
         </div>
       )}

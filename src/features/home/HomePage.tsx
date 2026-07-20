@@ -34,7 +34,9 @@ export function HomePage() {
 
   if (!user) return null
 
-  const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0)
+  const totalBalance = accounts
+    .filter((account) => account.includeInTotal)
+    .reduce((sum, account) => sum + account.balance, 0)
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">

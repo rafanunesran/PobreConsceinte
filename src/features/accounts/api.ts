@@ -22,6 +22,7 @@ const accountConverter: FirestoreDataConverter<Account> = {
     type: account.type,
     balance: account.balance,
     currency: account.currency,
+    includeInTotal: account.includeInTotal,
   }),
   fromFirestore: (snapshot: QueryDocumentSnapshot) => {
     const data = snapshot.data()
@@ -32,6 +33,9 @@ const accountConverter: FirestoreDataConverter<Account> = {
       type,
       balance: typeof data.balance === 'number' ? data.balance : 0,
       currency: 'BRL',
+      // NOTE: doc pré-existente sem o campo degrada pra `true` — não
+      // regride contas já criadas antes desta mudança.
+      includeInTotal: typeof data.includeInTotal === 'boolean' ? data.includeInTotal : true,
     }
   },
 }

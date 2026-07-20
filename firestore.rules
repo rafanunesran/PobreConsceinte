@@ -13,7 +13,17 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
         && request.resource.data.type in ['corrente', 'poupanca', 'carteira', 'investimento']
         && request.resource.data.balance is number
-        && request.resource.data.currency == 'BRL';
+        && request.resource.data.currency == 'BRL'
+        && request.resource.data.includeInTotal is bool;
+    }
+
+    match /users/{userId}/caixinhas/{caixinhaId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.accountId is string
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.balance is number;
     }
 
     match /users/{userId}/cards/{cardId} {
