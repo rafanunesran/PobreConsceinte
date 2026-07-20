@@ -83,6 +83,13 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'contas/transferir',
+          lazy: async () => {
+            const { AccountTransferPage } = await import('./features/accounts/AccountTransferPage')
+            return { Component: AccountTransferPage }
+          },
+        },
+        {
           path: 'contas/:accountId/editar',
           lazy: async () => {
             const { AccountFormPage } = await import('./features/accounts/AccountFormPage')

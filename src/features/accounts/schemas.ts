@@ -17,3 +17,16 @@ export const adjustAccountBalanceSchema = z.object({
 })
 
 export type AdjustAccountBalanceFormData = z.infer<typeof adjustAccountBalanceSchema>
+
+export const accountTransferSchema = z
+  .object({
+    fromAccountId: z.string().min(1, 'Selecione a conta de origem'),
+    toAccountId: z.string().min(1, 'Selecione a conta de destino'),
+    amount: z.number('Informe um valor válido').positive('Informe um valor maior que zero'),
+  })
+  .refine((data) => data.fromAccountId !== data.toAccountId, {
+    message: 'A conta de destino precisa ser diferente da de origem',
+    path: ['toAccountId'],
+  })
+
+export type AccountTransferFormData = z.infer<typeof accountTransferSchema>

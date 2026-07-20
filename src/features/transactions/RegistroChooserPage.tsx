@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowDownCircle, ArrowUpCircle, ClipboardCheck } from 'lucide-react'
+import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, ClipboardCheck } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useTransactions } from './useTransactions'
 import { PendingTransactionsGrid } from './PendingTransactionsGrid'
@@ -22,7 +22,7 @@ export function RegistroChooserPage() {
 
       <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <Link
           to="/registros/despesa/nova"
           className="flex flex-col items-center gap-2 rounded-2xl border border-border-light bg-surface-light p-4 text-center transition-colors duration-200 hover:border-brand-500 dark:border-border-dark dark:bg-surface-dark-elevated"
@@ -49,6 +49,21 @@ export function RegistroChooserPage() {
             <p className="font-medium text-light-primary dark:text-dark-primary">Nova receita</p>
             <p className="text-xs text-light-secondary dark:text-dark-secondary">
               Vinculada a conta
+            </p>
+          </div>
+        </Link>
+
+        <Link
+          to="/contas/transferir"
+          className="flex flex-col items-center gap-2 rounded-2xl border border-border-light bg-surface-light p-4 text-center transition-colors duration-200 hover:border-brand-500 dark:border-border-dark dark:bg-surface-dark-elevated"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/10 text-violet-500">
+            <ArrowLeftRight size={24} />
+          </span>
+          <div>
+            <p className="font-medium text-light-primary dark:text-dark-primary">Transferência</p>
+            <p className="text-xs text-light-secondary dark:text-dark-secondary">
+              Entre suas contas
             </p>
           </div>
         </Link>

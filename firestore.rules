@@ -14,7 +14,12 @@ service cloud.firestore {
         && request.resource.data.type in ['corrente', 'poupanca', 'carteira', 'investimento']
         && request.resource.data.balance is number
         && request.resource.data.currency == 'BRL'
-        && request.resource.data.includeInTotal is bool;
+        // Tolerante a ausência: contas criadas antes deste campo existir
+        // nunca tiveram `includeInTotal` persistido, e uma escrita parcial
+        // de saldo (ex: confirmar pagamento, ajuste de fatura, transferência)
+        // resulta num documento final mesclado que ainda não o tem — exigir
+        // sempre o campo quebraria toda escrita de saldo nessas contas.
+        && (!request.resource.data.keys().hasAny(['includeInTotal']) || request.resource.data.includeInTotal is bool);
     }
 
     match /users/{userId}/caixinhas/{caixinhaId} {
@@ -80,10 +85,13 @@ service cloud.firestore {
     }
 
     // NOTE: escrever numa transação também escreve o `balance` da conta
-    // vinculada (runTransaction em transactions/api.ts) — a regra de
-    // `accounts` acima já cobre isso: um update parcial só de `balance`
-    // resulta no doc final mesclado com os campos antigos, que continua
-    // batendo com a validação de shape já existente.
+    // vinculada (runTransaction em transactions/api.ts, payCardInvoice,
+    // depositToCaixinha/withdrawFromCaixinha, transferBetweenAccounts) — a
+    // regra de `accounts` acima cobre isso: um update parcial só de
+    // `balance` resulta no doc final mesclado com os campos antigos, que
+    // precisa continuar batendo com a validação de shape já existente
+    // mesmo pra contas antigas sem `includeInTotal` persistido (daí a
+    // checagem tolerante a ausência nesse campo específico).
 
     match /{document=**} {
       allow read, write: if false;
