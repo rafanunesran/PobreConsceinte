@@ -30,6 +30,8 @@ interface PendingColumnProps {
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onConfirmSelected: () => void
+  selectedExtraIds?: Set<string>
+  onToggleExtraSelect?: (cardId: string) => void
 }
 
 function PendingColumn({
@@ -45,11 +47,18 @@ function PendingColumn({
   selectedIds,
   onToggleSelect,
   onConfirmSelected,
+  selectedExtraIds,
+  onToggleExtraSelect,
 }: PendingColumnProps) {
   const hasExtraRows = extraRows !== undefined && extraRows.length > 0
-  const selectedTotal = items
+  const selectedItemsTotal = items
     .filter((t) => selectedIds.has(t.id))
     .reduce((sum, t) => sum + t.amount, 0)
+  const selectedExtraTotal = (extraRows ?? [])
+    .filter((row) => selectedExtraIds?.has(row.cardId))
+    .reduce((sum, row) => sum + row.periodOwed, 0)
+  const selectedTotal = selectedItemsTotal + selectedExtraTotal
+  const hasAnySelection = selectedIds.size > 0 || (selectedExtraIds?.size ?? 0) > 0
   const isConfirmingSelected = [...selectedIds].some((id) => confirmingIds.has(id))
 
   return (
@@ -61,20 +70,22 @@ function PendingColumn({
             {title}
           </p>
         </div>
-        {selectedIds.size > 0 ? (
+        {hasAnySelection ? (
           <div className="flex items-center justify-between gap-1.5">
             <span className="text-xs font-semibold text-light-primary dark:text-dark-primary">
               {formatBRL(selectedTotal)}
             </span>
-            <Button
-              type="button"
-              variant="secondary"
-              className="shrink-0 px-2 py-1 text-xs"
-              disabled={isConfirmingSelected}
-              onClick={onConfirmSelected}
-            >
-              {isConfirmingSelected ? 'Pagando' : `Pagar (${selectedIds.size})`}
-            </Button>
+            {selectedIds.size > 0 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="shrink-0 px-2 py-1 text-xs"
+                disabled={isConfirmingSelected}
+                onClick={onConfirmSelected}
+              >
+                {isConfirmingSelected ? 'Pagando' : `Pagar (${selectedIds.size})`}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -91,6 +102,8 @@ function PendingColumn({
                   cardId={row.cardId}
                   cardName={row.cardName}
                   amount={row.periodOwed}
+                  selected={selectedExtraIds?.has(row.cardId) ?? false}
+                  onToggleSelect={() => onToggleExtraSelect?.(row.cardId)}
                 />
               ))
             : null}
@@ -124,6 +137,7 @@ export function PendingTransactionsGrid({ uid, transactions, selectedMonth }: Pe
   const { confirmingIds, confirm, confirmMany } = useConfirmPending(uid)
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set())
   const [selectedIncomeIds, setSelectedIncomeIds] = useState<Set<string>>(new Set())
+  const [selectedCardInvoiceIds, setSelectedCardInvoiceIds] = useState<Set<string>>(new Set())
 
   const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
 
@@ -187,6 +201,8 @@ export function PendingTransactionsGrid({ uid, transactions, selectedMonth }: Pe
         selectedIds={selectedExpenseIds}
         onToggleSelect={(id) => setSelectedExpenseIds((prev) => toggleInSet(prev, id))}
         onConfirmSelected={handleConfirmSelectedExpenses}
+        selectedExtraIds={selectedCardInvoiceIds}
+        onToggleExtraSelect={(cardId) => setSelectedCardInvoiceIds((prev) => toggleInSet(prev, cardId))}
       />
       <PendingColumn
         title="Receitas pendentes"

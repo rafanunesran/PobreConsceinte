@@ -28,15 +28,13 @@ export function buildPayInvoiceSchema(owed: number) {
       .positive('Informe um valor maior que zero')
       .max(owed, 'O valor não pode ser maior que o valor da fatura'),
     accountId: z.string().min(1, 'Selecione uma conta'),
-    categoryId: z.string().min(1, 'Selecione uma categoria'),
   })
 }
 
 export type PayInvoiceFormData = z.infer<ReturnType<typeof buildPayInvoiceSchema>>
 
 export const adjustInvoiceSchema = z.object({
-  amount: z.number('Informe um valor válido').positive('Informe um valor maior que zero'),
-  type: z.enum(['expense', 'income'], 'Selecione o tipo'),
+  realValue: z.number('Informe um valor válido').nonnegative('Informe um valor válido'),
 })
 
 export type AdjustInvoiceFormData = z.infer<typeof adjustInvoiceSchema>

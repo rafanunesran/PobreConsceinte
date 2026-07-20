@@ -7,6 +7,7 @@ import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
 import { useAccounts } from '../accounts/useAccounts'
 import { useCategories } from '../categories/useCategories'
+import { getOrCreateCategoryByName } from '../categories/api'
 import { buildPayInvoiceSchema, type PayInvoiceFormData } from './schemas'
 import { payCardInvoice } from './invoicePayment'
 import {
@@ -32,7 +33,6 @@ export function PayCardInvoicePage() {
   const { transactions, loading: loadingTransactions } = useTransactions(user?.uid ?? '')
   const { accounts } = useAccounts(user?.uid ?? '')
   const { categories } = useCategories(user?.uid ?? '')
-  const expenseCategories = categories.filter((c) => c.type === 'expense')
 
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -53,13 +53,13 @@ export function PayCardInvoicePage() {
 
   const form = useForm<PayInvoiceFormData>({
     resolver: zodResolver(buildPayInvoiceSchema(owed || 1)),
-    defaultValues: { amountPaid: 0, accountId: '', categoryId: '' },
+    defaultValues: { amountPaid: 0, accountId: '' },
   })
 
   // Só reage a `owed` (o teto muda quando os dados carregam) — `form` do
   // react-hook-form é estável entre renders, não precisa entrar nas deps.
   useEffect(() => {
-    form.reset({ amountPaid: owed, accountId: form.getValues('accountId'), categoryId: form.getValues('categoryId') })
+    form.reset({ amountPaid: owed, accountId: form.getValues('accountId') })
   }, [owed, form])
 
   const loading = loadingCards || loadingTransactions
@@ -81,11 +81,21 @@ export function PayCardInvoicePage() {
     if (!user || !card || !period) return
     setFormError(null)
     try {
+      // categoria fixa ("Outro") — o pagamento só unifica compras que já
+      // têm sua própria categoria, não faz sentido pedir uma nova aqui.
+      const categoryId = await getOrCreateCategoryByName(
+        user.uid,
+        categories,
+        'Outro',
+        'expense',
+        'more',
+        '#3B82F6',
+      )
       await payCardInvoice(user.uid, {
         cardId: card.id,
         cardName: card.name,
         accountId: data.accountId,
-        categoryId: data.categoryId,
+        categoryId,
         amountPaid: data.amountPaid,
         paymentDate: todayDateString(),
         unpaidTransactionIds: unpaidPeriodTransactions.map((t) => t.id),
@@ -132,19 +142,6 @@ export function PayCardInvoicePage() {
           {accounts.map((account) => (
             <option key={account.id} value={account.id}>
               {account.name}
-            </option>
-          ))}
-        </Select>
-
-        <Select
-          label="Categoria"
-          error={form.formState.errors.categoryId?.message}
-          {...form.register('categoryId')}
-        >
-          <option value="">Selecione</option>
-          {expenseCategories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
             </option>
           ))}
         </Select>

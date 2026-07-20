@@ -63,3 +63,19 @@ export async function getCategory(uid: string, categoryId: string): Promise<Cate
   const snapshot = await getDoc(categoryDoc(uid, categoryId))
   return snapshot.exists() ? snapshot.data() : null
 }
+
+// Usado por fluxos automáticos (ajuste de fatura, ajuste de saldo, etc.)
+// que precisam de uma categoria fixa sem pedir pro usuário escolher —
+// reaproveita se já existir, cria só na primeira vez.
+export async function getOrCreateCategoryByName(
+  uid: string,
+  categories: Category[],
+  name: string,
+  type: CategoryType,
+  icon: CategoryIcon,
+  color: CategoryColor,
+): Promise<string> {
+  const existing = categories.find((c) => c.type === type && c.name === name)
+  if (existing) return existing.id
+  return createCategory(uid, { name, type, icon, color })
+}

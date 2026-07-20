@@ -4,14 +4,22 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
 import { useCards } from './useCards'
+import { useTransactions } from '../transactions/useTransactions'
 import { useCategories } from '../categories/useCategories'
-import { createCategory } from '../categories/api'
+import { getOrCreateCategoryByName } from '../categories/api'
 import { createTransaction } from '../transactions/api'
-import { getInvoicePeriod, shiftInvoicePeriod, todayDateString } from './invoiceUtils'
+import {
+  getInvoicePeriod,
+  shiftInvoicePeriod,
+  sumUnpaid,
+  todayDateString,
+  transactionsInPeriod,
+} from './invoiceUtils'
+import { roundToCents } from '../transactions/dateUtils'
 import { adjustInvoiceSchema, type AdjustInvoiceFormData } from './schemas'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { cn } from '../../lib/utils'
+import { formatBRL } from '../../lib/utils'
 
 export function AdjustInvoicePage() {
   const navigate = useNavigate()
@@ -21,6 +29,7 @@ export function AdjustInvoicePage() {
   const user = useAuthStore((state) => state.user)
 
   const { cards, loading: loadingCards } = useCards(user?.uid ?? '')
+  const { transactions, loading: loadingTransactions } = useTransactions(user?.uid ?? '')
   const { categories } = useCategories(user?.uid ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -32,15 +41,23 @@ export function AdjustInvoicePage() {
     return shiftInvoicePeriod(card.closingDay, openPeriod, periodOffset)
   }, [card, periodOffset])
 
+  const calculatedOwed = useMemo(() => {
+    if (!card || !period) return 0
+    return sumUnpaid(transactionsInPeriod(transactions, card.id, period))
+  }, [card, period, transactions])
+
   const form = useForm<AdjustInvoiceFormData>({
     resolver: zodResolver(adjustInvoiceSchema),
-    defaultValues: { amount: 0, type: 'expense' },
+    defaultValues: { realValue: 0 },
   })
-  const type = form.watch('type')
+  const realValue = form.watch('realValue')
+  const diff = roundToCents((realValue || 0) - calculatedOwed)
+
+  const loading = loadingCards || loadingTransactions
 
   if (!user) return null
 
-  if (!loadingCards && !card) {
+  if (!loading && !card) {
     navigate('/cartoes', { replace: true })
     return null
   }
@@ -48,19 +65,24 @@ export function AdjustInvoicePage() {
   async function onSubmit(data: AdjustInvoiceFormData) {
     if (!user || !card || !period) return
     setFormError(null)
+    const amount = roundToCents(data.realValue - calculatedOwed)
+    if (amount === 0) {
+      navigate(`/cartoes/${card.id}/fatura`)
+      return
+    }
+    const type = amount > 0 ? 'expense' : 'income'
     try {
-      let categoryId = categories.find((c) => c.type === data.type && c.name === 'Outro')?.id
-      if (categoryId === undefined) {
-        categoryId = await createCategory(user.uid, {
-          name: 'Outro',
-          type: data.type,
-          icon: 'more',
-          color: data.type === 'expense' ? '#3B82F6' : '#F59E0B',
-        })
-      }
+      const categoryId = await getOrCreateCategoryByName(
+        user.uid,
+        categories,
+        'Outro',
+        type,
+        'more',
+        type === 'expense' ? '#3B82F6' : '#F59E0B',
+      )
       await createTransaction(user.uid, {
-        type: data.type,
-        amount: data.amount,
+        type,
+        amount: Math.abs(amount),
         date: period.start,
         description: 'Ajuste de fatura',
         categoryId,
@@ -73,7 +95,7 @@ export function AdjustInvoicePage() {
     }
   }
 
-  if (loadingCards || !card) {
+  if (loading || !card) {
     return (
       <div className="px-6 pt-4 text-sm text-light-secondary dark:text-dark-secondary">
         Carregando...
@@ -87,48 +109,34 @@ export function AdjustInvoicePage() {
         Ajuste de fatura — {card.name}
       </h1>
 
+      <p className="text-sm text-light-secondary dark:text-dark-secondary">
+        Valor calculado nesta fatura: <span className="font-semibold">{formatBRL(calculatedOwed)}</span>
+      </p>
+
       <form className="flex flex-col gap-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
         <Input
-          label="Valor do ajuste"
+          label="Valor real da fatura"
           type="number"
           step="0.01"
-          error={form.formState.errors.amount?.message}
-          {...form.register('amount', { valueAsNumber: true })}
+          error={form.formState.errors.realValue?.message}
+          {...form.register('realValue', { valueAsNumber: true })}
         />
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm text-light-secondary dark:text-dark-secondary">Tipo de ajuste</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => form.setValue('type', 'expense')}
-              className={cn(
-                'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                type === 'expense'
-                  ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                  : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
-              )}
-            >
-              Despesa (aumenta a fatura)
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setValue('type', 'income')}
-              className={cn(
-                'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                type === 'income'
-                  ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                  : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
-              )}
-            >
-              Receita (reduz a fatura)
-            </button>
-          </div>
-        </div>
+        {diff !== 0 ? (
+          <p className="text-sm text-light-secondary dark:text-dark-secondary">
+            {diff > 0
+              ? `Será criada uma despesa de ${formatBRL(diff)} pra igualar a fatura ao valor real.`
+              : `Será criada uma receita de ${formatBRL(-diff)} pra igualar a fatura ao valor real.`}
+          </p>
+        ) : (
+          <p className="text-sm text-light-secondary dark:text-dark-secondary">
+            Sem diferença — nenhum ajuste será criado.
+          </p>
+        )}
 
         {formError ? <p className="text-sm text-danger">{formError}</p> : null}
 
-        <Button type="submit" disabled={form.formState.isSubmitting}>
+        <Button type="submit" disabled={form.formState.isSubmitting || diff === 0}>
           {form.formState.isSubmitting ? 'Salvando...' : 'Criar ajuste'}
         </Button>
       </form>
