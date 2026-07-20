@@ -4,6 +4,7 @@ import { Header } from './Header'
 import { BottomNav } from './BottomNav'
 import { Sidebar } from './Sidebar'
 import { FAB } from './FAB'
+import { Splash } from './Splash'
 import { useAuthStore } from '../../stores/authStore'
 import { useWorkspaceStore, syncWorkspace } from '../../stores/workspaceStore'
 import { upsertMyProfile } from '../../features/family/userProfiles'
@@ -43,6 +44,15 @@ export function AppShell() {
   useEffect(() => {
     if (workspaceId && !workspaceLoading) void topUpRecurringRules(workspaceId)
   }, [workspaceId, workspaceLoading])
+
+  // Essencial: as páginas abaixo (Outlet) usam `workspaceId` direto como
+  // segmento de caminho no Firestore (`users/{workspaceId}/...`). Se
+  // renderizássemos o Outlet antes do workspace resolver, `workspaceId`
+  // ainda seria null e cada hook de dado chamaria `collection(db, 'users',
+  // '', 'accounts')` — uma referência inválida (segmento vazio), que o SDK
+  // rejeita na hora e derruba o app inteiro. Mesmo padrão do ProtectedRoute
+  // esperando `initializing` antes de renderizar.
+  if (workspaceLoading || !workspaceId) return <Splash />
 
   return (
     <div className="min-h-svh bg-bg-light dark:bg-bg-dark lg:flex">
