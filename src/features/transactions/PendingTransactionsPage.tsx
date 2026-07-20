@@ -1,22 +1,21 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useTransactions } from './useTransactions'
-import { useCategories } from '../categories/useCategories'
-import { useConfirmPending } from './useConfirmPending'
-import { PendingTransactionRow } from './PendingTransactionRow'
+import { PendingTransactionsGrid } from './PendingTransactionsGrid'
+import { MonthSelector } from '../../components/ui/MonthSelector'
+import { currentYearMonth } from './dateUtils'
 import { Button } from '../../components/ui/Button'
 
 export function PendingTransactionsPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const { transactions, loading, error } = useTransactions(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
-  const { confirmingId, confirm } = useConfirmPending(user?.uid ?? '')
+  const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
   if (!user) return null
 
-  const categoriesById = new Map(categories.map((category) => [category.id, category]))
   const pending = transactions.filter((transaction) => !transaction.paid)
 
   return (
@@ -62,17 +61,14 @@ export function PendingTransactionsPage() {
           </Link>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {pending.map((transaction) => (
-            <PendingTransactionRow
-              key={transaction.id}
-              transaction={transaction}
-              category={categoriesById.get(transaction.categoryId)}
-              confirming={confirmingId === transaction.id}
-              onConfirm={() => confirm(transaction)}
-            />
-          ))}
-        </div>
+        <>
+          <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+          <PendingTransactionsGrid
+            uid={user.uid}
+            transactions={transactions}
+            selectedMonth={selectedMonth}
+          />
+        </>
       )}
     </div>
   )

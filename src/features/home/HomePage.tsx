@@ -1,7 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, MoreHorizontal, Plus, Receipt } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useAccounts } from '../accounts/useAccounts'
+import { useTransactions } from '../transactions/useTransactions'
+import { BalanceteCard } from '../transactions/BalanceteCard'
+import { currentYearMonth } from '../transactions/dateUtils'
+import { MonthSelector } from '../../components/ui/MonthSelector'
 import { formatBRL } from '../../lib/utils'
 
 const quickActions = [
@@ -14,6 +19,8 @@ const quickActions = [
 export function HomePage() {
   const user = useAuthStore((state) => state.user)
   const { accounts, loading } = useAccounts(user?.uid ?? '')
+  const { transactions } = useTransactions(user?.uid ?? '')
+  const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
   if (!user) return null
 
@@ -41,6 +48,10 @@ export function HomePage() {
           </Link>
         ))}
       </section>
+
+      <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+
+      <BalanceteCard transactions={transactions} selectedMonth={selectedMonth} />
     </div>
   )
 }

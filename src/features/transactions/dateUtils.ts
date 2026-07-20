@@ -37,3 +37,8 @@ export function monthsBetween(fromDate: string, toDate: string): number {
 export function roundToCents(value: number): number {
   return Math.round(value * 100) / 100
 }
+
+export function currentYearMonth(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
