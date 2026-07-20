@@ -15,6 +15,14 @@ export default defineConfig(({ command }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
+      // Sem isso, um service worker já instalado só troca de versão quando
+      // todas as abas/instâncias antigas do PWA são fechadas — a pessoa
+      // pode recarregar a página várias vezes e continuar vendo a versão
+      // antiga em cache.
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+      },
       manifest: {
         name: 'Pobre Consceinte',
         short_name: 'Pobre Consceinte',
