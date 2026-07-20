@@ -4,6 +4,7 @@ export interface Caixinha {
   name: string
   balance: number
   yieldLabel?: string // só rótulo informativo, ex: "110% do CDI" — nunca calculado
+  createdBy: string // uid de quem criou — nunca alterado em updates
 }
 
 export const CAIXINHA_MOVEMENT_TYPES = ['guardar', 'resgatar', 'rendimento', 'ajuste'] as const
@@ -24,4 +25,5 @@ export interface CaixinhaMovement {
   type: CaixinhaMovementType
   amount: number // efeito assinado no saldo da caixinha: positivo aumenta, negativo diminui
   date: string // 'YYYY-MM-DD'
+  createdBy: string // uid de quem fez a movimentação
 }

@@ -11,6 +11,7 @@ const caixinhaMovementConverter: FirestoreDataConverter<CaixinhaMovement> = {
     type: movement.type,
     amount: movement.amount,
     date: movement.date,
+    createdBy: movement.createdBy,
   }),
   fromFirestore: (snapshot: QueryDocumentSnapshot) => {
     const data = snapshot.data()
@@ -21,6 +22,7 @@ const caixinhaMovementConverter: FirestoreDataConverter<CaixinhaMovement> = {
       type,
       amount: typeof data.amount === 'number' ? data.amount : 0,
       date: typeof data.date === 'string' ? data.date : '',
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
     }
   },
 }

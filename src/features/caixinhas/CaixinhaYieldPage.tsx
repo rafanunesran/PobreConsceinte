@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from '../accounts/useAccounts'
 import { useCaixinhas } from './useCaixinhas'
 import { useCategories } from '../categories/useCategories'
@@ -16,10 +17,11 @@ export function CaixinhaYieldPage() {
   const navigate = useNavigate()
   const { accountId, caixinhaId } = useParams<{ accountId: string; caixinhaId: string }>()
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { accounts, loading: loadingAccounts } = useAccounts(user?.uid ?? '')
-  const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(user?.uid ?? '', accountId ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
+  const { accounts, loading: loadingAccounts } = useAccounts(workspaceId ?? '')
+  const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(workspaceId ?? '', accountId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
   const account = accounts.find((a) => a.id === accountId)
@@ -31,7 +33,7 @@ export function CaixinhaYieldPage() {
     defaultValues: { amount: 0 },
   })
 
-  if (!user || !accountId || !caixinhaId) return null
+  if (!user || !workspaceId || !accountId || !caixinhaId) return null
 
   if (!loading && (!account || !caixinha)) {
     navigate(`/contas/${accountId ?? ''}`, { replace: true })
@@ -39,18 +41,27 @@ export function CaixinhaYieldPage() {
   }
 
   async function onSubmit(data: CaixinhaYieldFormData) {
-    if (!user || !account || !caixinha) return
+    if (!user || !workspaceId || !account || !caixinha) return
     setFormError(null)
     try {
       const categoryId = await getOrCreateCategoryByName(
-        user.uid,
+        workspaceId,
         categories,
         'Outro',
         'income',
         'more',
         '#F59E0B',
+        user.uid,
       )
-      await registerCaixinhaYield(user.uid, account.id, caixinha.id, caixinha.name, data.amount, categoryId)
+      await registerCaixinhaYield(
+        workspaceId,
+        account.id,
+        caixinha.id,
+        caixinha.name,
+        data.amount,
+        categoryId,
+        user.uid,
+      )
       navigate(`/contas/${account.id}`)
     } catch {
       setFormError('Não foi possível registrar o rendimento. Tente novamente.')

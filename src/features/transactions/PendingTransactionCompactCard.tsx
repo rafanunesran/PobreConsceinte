@@ -6,6 +6,8 @@ import type { Category } from '../categories/types'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { cn, formatBRL } from '../../lib/utils'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useUserProfiles } from '../family/useUserProfiles'
 import type { Transaction } from './types'
 
 interface PendingTransactionCompactCardProps {
@@ -26,6 +28,9 @@ export function PendingTransactionCompactCard({
   onToggleSelect,
 }: PendingTransactionCompactCardProps) {
   const Icon = category ? CATEGORY_ICON_COMPONENTS[category.icon] : CircleDashed
+  const family = useWorkspaceStore((state) => state.family)
+  const profiles = useUserProfiles(family ? [transaction.createdBy] : [])
+  const authorName = family ? profiles.get(transaction.createdBy)?.displayName : undefined
 
   return (
     <Card className="flex flex-col gap-2 p-3">
@@ -50,6 +55,7 @@ export function PendingTransactionCompactCard({
       <div>
         <p className="text-xs text-light-secondary dark:text-dark-secondary">
           {format(new Date(`${transaction.date}T00:00:00`), "d 'de' MMM", { locale: ptBR })}
+          {authorName ? ` · ${authorName}` : ''}
         </p>
         <p
           className={cn(

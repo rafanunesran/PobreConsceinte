@@ -21,6 +21,7 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       description: t.description,
       categoryId: t.categoryId,
       paid: t.paid,
+      createdBy: t.createdBy,
       ...(t.recurringRuleId !== undefined ? { recurringRuleId: t.recurringRuleId } : {}),
       ...(t.installmentGroupId !== undefined
         ? {
@@ -50,6 +51,7 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       // NOTE: doc pré-existente sem `paid` degrada pra `false`, nunca
       // `true` por engano — não pode assumir que algo já foi pago.
       paid: typeof data.paid === 'boolean' ? data.paid : false,
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
       ...(accountId !== undefined ? { accountId } : {}),
       ...(cardId !== undefined ? { cardId } : {}),
       ...(recurringRuleId !== undefined ? { recurringRuleId } : {}),
@@ -95,7 +97,11 @@ function assertValidLinkage(data: TransactionFormData): void {
   }
 }
 
-export async function createTransaction(uid: string, data: TransactionFormData): Promise<string> {
+export async function createTransaction(
+  uid: string,
+  data: TransactionFormData,
+  createdBy: string,
+): Promise<string> {
   assertValidLinkage(data)
   // addDoc não existe dentro de runTransaction; gera o id do lado do
   // cliente com doc(collectionRef) (sem round-trip) e usa transaction.set().
@@ -117,7 +123,7 @@ export async function createTransaction(uid: string, data: TransactionFormData):
         balance: accountSnap.data().balance + signedEffect(data.type, data.amount),
       })
     }
-    transaction.set(newTxRef, { id: newTxRef.id, ...data })
+    transaction.set(newTxRef, { id: newTxRef.id, createdBy, ...data })
   })
 
   return newTxRef.id
@@ -194,7 +200,10 @@ export async function updateTransaction(
       }
     }
 
-    transaction.set(txRef, { id: transactionId, ...data })
+    // `set` sobrescreve o doc inteiro — precisa levar adiante o
+    // `createdBy` original (não vem em `data`, que é só o form) senão a
+    // autoria se perde a cada edição.
+    transaction.set(txRef, { id: transactionId, createdBy: oldData.createdBy, ...data })
   })
 }
 

@@ -71,6 +71,7 @@ export interface Category {
   type: CategoryType
   icon: CategoryIcon
   color: CategoryColor
+  createdBy: string // uid de quem criou — nunca alterado em updates
 }
 
 interface SuggestedCategory {

@@ -15,4 +15,5 @@ export interface Account {
   balance: number
   currency: 'BRL'
   includeInTotal: boolean // false = fica fora da somatória do Home
+  createdBy: string // uid de quem criou — nunca alterado em updates
 }

@@ -3,6 +3,8 @@ import { Settings } from 'lucide-react'
 import { CARD_BRAND_LABELS, type CreditCard } from './types'
 import { Card } from '../../components/ui/Card'
 import { formatBRL } from '../../lib/utils'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useUserProfiles } from '../family/useUserProfiles'
 
 interface CardTileProps {
   card: CreditCard
@@ -11,6 +13,10 @@ interface CardTileProps {
 }
 
 export function CardTile({ card, occupied, available }: CardTileProps) {
+  const family = useWorkspaceStore((state) => state.family)
+  const profiles = useUserProfiles(family ? [card.createdBy] : [])
+  const authorName = family ? profiles.get(card.createdBy)?.displayName : undefined
+
   return (
     <div className="relative">
       <Link
@@ -49,6 +55,11 @@ export function CardTile({ card, occupied, available }: CardTileProps) {
           <p className="mt-3 text-sm text-light-secondary dark:text-dark-secondary">
             Fecha dia {card.closingDay}, vence dia {card.dueDay}
           </p>
+          {authorName ? (
+            <p className="mt-1 text-xs text-light-secondary dark:text-dark-secondary">
+              Adicionado por {authorName}
+            </p>
+          ) : null}
         </Card>
       </Link>
     </div>

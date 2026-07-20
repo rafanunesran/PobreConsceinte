@@ -5,6 +5,8 @@ import { BottomNav } from './BottomNav'
 import { Sidebar } from './Sidebar'
 import { FAB } from './FAB'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore, syncWorkspace } from '../../stores/workspaceStore'
+import { upsertMyProfile } from '../../features/family/userProfiles'
 import { topUpRecurringRules } from '../../features/transactions/recurring'
 
 // NOTE: abaixo de `lg`, comportamento igual ao original (coluna única de
@@ -12,13 +14,35 @@ import { topUpRecurringRules } from '../../features/transactions/recurring'
 // de conteúdo cresce (com um teto pra não esticar demais em telas ultra-wide).
 export function AppShell() {
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const workspaceLoading = useWorkspaceStore((state) => state.loading)
+
+  // Observa a família (se houver) assim que a pessoa loga — resolve
+  // `workspaceId` (meu uid em modo solo, ou o uid do dono da família).
+  useEffect(() => {
+    if (!user) return
+    return syncWorkspace(user.uid)
+  }, [user])
+
+  // Mantém o espelho público de nome/foto em dia — necessário pra outros
+  // membros da família conseguirem resolver "adicionado por Fulano".
+  useEffect(() => {
+    if (!user) return
+    void upsertMyProfile(user.uid, {
+      displayName: user.displayName ?? user.email ?? 'Sem nome',
+      email: user.email ?? '',
+      ...(user.photoURL ? { photoURL: user.photoURL } : {}),
+    })
+  }, [user])
 
   // Garante que nenhuma regra recorrente fique com menos de 6 meses
   // gerados — roda uma vez por sessão, silenciosamente (sem UI de loading;
-  // falha aqui não deve travar a navegação).
+  // falha aqui não deve travar a navegação). Espera o workspace resolver
+  // pra não gerar ocorrências no lugar errado (meu uid) antes de saber se
+  // devo operar no namespace de uma família.
   useEffect(() => {
-    if (user) void topUpRecurringRules(user.uid)
-  }, [user])
+    if (workspaceId && !workspaceLoading) void topUpRecurringRules(workspaceId)
+  }, [workspaceId, workspaceLoading])
 
   return (
     <div className="min-h-svh bg-bg-light dark:bg-bg-dark lg:flex">

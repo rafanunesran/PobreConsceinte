@@ -19,4 +19,5 @@ export interface CreditCard {
   limit: number
   closingDay: number
   dueDay: number
+  createdBy: string // uid de quem criou — nunca alterado em updates
 }

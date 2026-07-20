@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
 import { useCategories } from '../categories/useCategories'
@@ -27,10 +28,11 @@ export function AdjustInvoicePage() {
   const [searchParams] = useSearchParams()
   const periodOffset = Number(searchParams.get('offset')) || 0
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { cards, loading: loadingCards } = useCards(user?.uid ?? '')
-  const { transactions, loading: loadingTransactions } = useTransactions(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
+  const { cards, loading: loadingCards } = useCards(workspaceId ?? '')
+  const { transactions, loading: loadingTransactions } = useTransactions(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
   const card = cards.find((c) => c.id === cardId)
@@ -55,7 +57,7 @@ export function AdjustInvoicePage() {
 
   const loading = loadingCards || loadingTransactions
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   if (!loading && !card) {
     navigate('/cartoes', { replace: true })
@@ -63,7 +65,7 @@ export function AdjustInvoicePage() {
   }
 
   async function onSubmit(data: AdjustInvoiceFormData) {
-    if (!user || !card || !period) return
+    if (!user || !workspaceId || !card || !period) return
     setFormError(null)
     const amount = roundToCents(data.realValue - calculatedOwed)
     if (amount === 0) {
@@ -73,22 +75,27 @@ export function AdjustInvoicePage() {
     const type = amount > 0 ? 'expense' : 'income'
     try {
       const categoryId = await getOrCreateCategoryByName(
-        user.uid,
+        workspaceId,
         categories,
         'Outro',
         type,
         'more',
         type === 'expense' ? '#3B82F6' : '#F59E0B',
+        user.uid,
       )
-      await createTransaction(user.uid, {
-        type,
-        amount: Math.abs(amount),
-        date: period.start,
-        description: 'Ajuste de fatura',
-        categoryId,
-        paid: false,
-        cardId: card.id,
-      })
+      await createTransaction(
+        workspaceId,
+        {
+          type,
+          amount: Math.abs(amount),
+          date: period.start,
+          description: 'Ajuste de fatura',
+          categoryId,
+          paid: false,
+          cardId: card.id,
+        },
+        user.uid,
+      )
       navigate(`/cartoes/${card.id}/fatura`)
     } catch {
       setFormError('Não foi possível criar o ajuste. Tente novamente.')

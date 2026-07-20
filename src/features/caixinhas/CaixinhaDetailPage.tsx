@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ArrowDownCircle, ArrowLeft, ArrowUpCircle, PiggyBank, Settings, TrendingUp } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCaixinhas } from './useCaixinhas'
 import { useCaixinhaMovements } from './useCaixinhaMovements'
 import { CAIXINHA_MOVEMENT_LABELS, type CaixinhaMovementType } from './types'
@@ -12,6 +13,7 @@ import { Button } from '../../components/ui/Button'
 import { MonthSelector } from '../../components/ui/MonthSelector'
 import { currentYearMonth } from '../transactions/dateUtils'
 import { cn, formatBRL } from '../../lib/utils'
+import { useUserProfiles } from '../family/useUserProfiles'
 
 const MOVEMENT_ICONS: Record<CaixinhaMovementType, typeof ArrowDownCircle> = {
   guardar: ArrowDownCircle,
@@ -28,25 +30,29 @@ export function CaixinhaDetailPage() {
   const navigate = useNavigate()
   const { accountId, caixinhaId } = useParams<{ accountId: string; caixinhaId: string }>()
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const family = useWorkspaceStore((state) => state.family)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
-  const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(user?.uid ?? '', accountId ?? '')
+  const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(workspaceId ?? '', accountId ?? '')
   const {
     movements,
     loading: loadingMovements,
     error: movementsError,
-  } = useCaixinhaMovements(user?.uid ?? '', caixinhaId ?? '')
+  } = useCaixinhaMovements(workspaceId ?? '', caixinhaId ?? '')
 
   const caixinha = caixinhas.find((c) => c.id === caixinhaId)
   const base = `/contas/${accountId}/caixinhas/${caixinhaId}`
+  const profiles = useUserProfiles(family && caixinha ? [caixinha.createdBy] : [])
+  const authorName = family && caixinha ? profiles.get(caixinha.createdBy)?.displayName : undefined
 
   const monthMovements = useMemo(
     () => movements.filter((m) => m.date.startsWith(selectedMonth)),
     [movements, selectedMonth],
   )
 
-  if (!user || !accountId || !caixinhaId) return null
+  if (!user || !workspaceId || !accountId || !caixinhaId) return null
 
   if (!loadingCaixinhas && !caixinha) {
     navigate(`/contas/${accountId}`, { replace: true })
@@ -72,6 +78,7 @@ export function CaixinhaDetailPage() {
             <p className="text-sm text-light-secondary dark:text-dark-secondary">
               {formatBRL(caixinha.balance)}
               {caixinha.yieldLabel ? ` · ${caixinha.yieldLabel}` : ''}
+              {authorName ? ` · Adicionado por ${authorName}` : ''}
             </p>
           ) : null}
         </div>

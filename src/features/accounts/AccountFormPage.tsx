@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
@@ -16,6 +17,7 @@ export function AccountFormPage() {
   const { accountId } = useParams<{ accountId?: string }>()
   const isEditMode = Boolean(accountId)
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
   const [formError, setFormError] = useState<string | null>(null)
   const [isLoadingAccount, setIsLoadingAccount] = useState(isEditMode)
@@ -25,7 +27,7 @@ export function AccountFormPage() {
   // Só precisa da lista pra checar "tem alguma?" antes de excluir — a
   // conta só pode ser removida com segurança depois que todas as
   // caixinhas foram encerradas (encerrar sempre devolve o saldo).
-  const { caixinhas } = useCaixinhas(user?.uid ?? '', accountId ?? '')
+  const { caixinhas } = useCaixinhas(workspaceId ?? '', accountId ?? '')
 
   const form = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -33,9 +35,9 @@ export function AccountFormPage() {
   })
 
   useEffect(() => {
-    if (!user || !accountId) return
+    if (!workspaceId || !accountId) return
     let cancelled = false
-    getAccount(user.uid, accountId)
+    getAccount(workspaceId, accountId)
       .then((account) => {
         if (cancelled) return
         if (!account) {
@@ -58,18 +60,18 @@ export function AccountFormPage() {
     return () => {
       cancelled = true
     }
-  }, [user, accountId, form, navigate])
+  }, [workspaceId, accountId, form, navigate])
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   async function onSubmit(data: AccountFormData) {
-    if (!user) return
+    if (!user || !workspaceId) return
     setFormError(null)
     try {
       if (accountId) {
-        await updateAccount(user.uid, accountId, data)
+        await updateAccount(workspaceId, accountId, data)
       } else {
-        await createAccount(user.uid, data)
+        await createAccount(workspaceId, data, user.uid)
       }
       navigate('/contas')
     } catch {
@@ -78,10 +80,10 @@ export function AccountFormPage() {
   }
 
   async function handleDelete() {
-    if (!user || !accountId) return
+    if (!workspaceId || !accountId) return
     setIsDeleting(true)
     try {
-      await deleteAccount(user.uid, accountId)
+      await deleteAccount(workspaceId, accountId)
       navigate('/contas')
     } catch {
       setFormError('Não foi possível excluir a conta. Tente novamente.')

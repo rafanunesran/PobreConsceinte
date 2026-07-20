@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { caixinhaSchema, type CaixinhaFormData } from './schemas'
@@ -14,6 +15,7 @@ export function CaixinhaFormPage() {
   const { accountId, caixinhaId } = useParams<{ accountId: string; caixinhaId?: string }>()
   const isEditMode = Boolean(caixinhaId)
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
   const [formError, setFormError] = useState<string | null>(null)
   const [isLoadingCaixinha, setIsLoadingCaixinha] = useState(isEditMode)
@@ -27,9 +29,9 @@ export function CaixinhaFormPage() {
   })
 
   useEffect(() => {
-    if (!user || !caixinhaId) return
+    if (!workspaceId || !caixinhaId) return
     let cancelled = false
-    getCaixinha(user.uid, caixinhaId)
+    getCaixinha(workspaceId, caixinhaId)
       .then((caixinha) => {
         if (cancelled) return
         if (!caixinha || !accountId) {
@@ -47,18 +49,18 @@ export function CaixinhaFormPage() {
     return () => {
       cancelled = true
     }
-  }, [user, caixinhaId, accountId, form, navigate])
+  }, [workspaceId, caixinhaId, accountId, form, navigate])
 
-  if (!user || !accountId) return null
+  if (!user || !workspaceId || !accountId) return null
 
   async function onSubmit(data: CaixinhaFormData) {
-    if (!user || !accountId) return
+    if (!user || !workspaceId || !accountId) return
     setFormError(null)
     try {
       if (caixinhaId) {
-        await updateCaixinha(user.uid, caixinhaId, data)
+        await updateCaixinha(workspaceId, caixinhaId, data)
       } else {
-        await createCaixinha(user.uid, accountId, data)
+        await createCaixinha(workspaceId, accountId, data, user.uid)
       }
       navigate(`/contas/${accountId}`)
     } catch {
@@ -67,10 +69,10 @@ export function CaixinhaFormPage() {
   }
 
   async function handleClose() {
-    if (!user || !caixinhaId || !accountId) return
+    if (!workspaceId || !caixinhaId || !accountId) return
     setIsClosing(true)
     try {
-      await closeCaixinha(user.uid, accountId, caixinhaId)
+      await closeCaixinha(workspaceId, accountId, caixinhaId)
       navigate(`/contas/${accountId}`)
     } catch {
       setFormError('Não foi possível encerrar a caixinha. Tente novamente.')

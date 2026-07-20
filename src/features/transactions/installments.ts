@@ -29,6 +29,7 @@ export async function createInstallmentExpense(
   installments: number,
   amountIsPerInstallment: boolean,
   firstOccurrencePaid: boolean,
+  createdBy: string,
 ): Promise<string> {
   if ((data.accountId !== undefined) === (data.cardId !== undefined)) {
     throw new Error('A despesa deve estar vinculada a exatamente uma conta ou um cartão.')
@@ -86,7 +87,7 @@ export async function createInstallmentExpense(
 
     for (const occurrence of occurrences) {
       const txId = `${groupId}_${occurrence.installmentIndex}`
-      transaction.set(transactionDoc(uid, txId), { id: txId, ...occurrence })
+      transaction.set(transactionDoc(uid, txId), { id: txId, createdBy, ...occurrence })
     }
   })
 

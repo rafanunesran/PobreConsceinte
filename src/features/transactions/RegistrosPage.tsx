@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Receipt } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useTransactions } from './useTransactions'
 import { useAccounts } from '../accounts/useAccounts'
 import { useCards } from '../cards/useCards'
@@ -13,13 +14,14 @@ import { Button } from '../../components/ui/Button'
 
 export function RegistrosPage() {
   const user = useAuthStore((state) => state.user)
-  const { transactions, loading, error } = useTransactions(user?.uid ?? '')
-  const { accounts } = useAccounts(user?.uid ?? '')
-  const { cards } = useCards(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const { transactions, loading, error } = useTransactions(workspaceId ?? '')
+  const { accounts } = useAccounts(workspaceId ?? '')
+  const { cards } = useCards(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   const accountsById = new Map(accounts.map((account) => [account.id, account]))
   const cardsById = new Map(cards.map((card) => [card.id, card]))

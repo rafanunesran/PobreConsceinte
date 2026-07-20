@@ -22,6 +22,7 @@ const caixinhaConverter: FirestoreDataConverter<Caixinha> = {
     accountId: caixinha.accountId,
     name: caixinha.name,
     balance: caixinha.balance,
+    createdBy: caixinha.createdBy,
     ...(caixinha.yieldLabel !== undefined ? { yieldLabel: caixinha.yieldLabel } : {}),
   }),
   fromFirestore: (snapshot: QueryDocumentSnapshot) => {
@@ -32,6 +33,7 @@ const caixinhaConverter: FirestoreDataConverter<Caixinha> = {
       accountId: typeof data.accountId === 'string' ? data.accountId : '',
       name: typeof data.name === 'string' ? data.name : '',
       balance: typeof data.balance === 'number' ? data.balance : 0,
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
       ...(yieldLabel !== undefined ? { yieldLabel } : {}),
     }
   },
@@ -49,12 +51,14 @@ export async function createCaixinha(
   uid: string,
   accountId: string,
   data: CaixinhaFormData,
+  createdBy: string,
 ): Promise<string> {
   const ref = await addDoc(caixinhasCollection(uid), {
     id: '',
     accountId,
     balance: 0,
     name: data.name,
+    createdBy,
     // string vazia (campo deixado em branco no form) vira "ausente" —
     // não persiste um yieldLabel sem conteúdo.
     ...(data.yieldLabel ? { yieldLabel: data.yieldLabel } : {}),
@@ -93,6 +97,7 @@ export async function adjustCaixinhaBalance(
   caixinhaId: string,
   realBalance: number,
   diff: number,
+  createdBy: string,
 ): Promise<void> {
   if (diff === 0) return
   const movementRef = doc(caixinhaMovementsCollection(uid))
@@ -104,6 +109,7 @@ export async function adjustCaixinhaBalance(
       type: 'ajuste',
       amount: diff,
       date: todayDateString(),
+      createdBy,
     })
   })
 }

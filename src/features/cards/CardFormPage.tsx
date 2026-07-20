@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
@@ -15,6 +16,7 @@ export function CardFormPage() {
   const { cardId } = useParams<{ cardId?: string }>()
   const isEditMode = Boolean(cardId)
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
   const [formError, setFormError] = useState<string | null>(null)
   const [isLoadingCard, setIsLoadingCard] = useState(isEditMode)
@@ -28,9 +30,9 @@ export function CardFormPage() {
   })
 
   useEffect(() => {
-    if (!user || !cardId) return
+    if (!workspaceId || !cardId) return
     let cancelled = false
-    getCard(user.uid, cardId)
+    getCard(workspaceId, cardId)
       .then((card) => {
         if (cancelled) return
         if (!card) {
@@ -54,18 +56,18 @@ export function CardFormPage() {
     return () => {
       cancelled = true
     }
-  }, [user, cardId, form, navigate])
+  }, [workspaceId, cardId, form, navigate])
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   async function onSubmit(data: CardFormData) {
-    if (!user) return
+    if (!user || !workspaceId) return
     setFormError(null)
     try {
       if (cardId) {
-        await updateCard(user.uid, cardId, data)
+        await updateCard(workspaceId, cardId, data)
       } else {
-        await createCard(user.uid, data)
+        await createCard(workspaceId, data, user.uid)
       }
       navigate('/cartoes')
     } catch {
@@ -74,10 +76,10 @@ export function CardFormPage() {
   }
 
   async function handleDelete() {
-    if (!user || !cardId) return
+    if (!workspaceId || !cardId) return
     setIsDeleting(true)
     try {
-      await deleteCard(user.uid, cardId)
+      await deleteCard(workspaceId, cardId)
       navigate('/cartoes')
     } catch {
       setFormError('Não foi possível excluir o cartão. Tente novamente.')

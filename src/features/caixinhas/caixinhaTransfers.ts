@@ -16,6 +16,7 @@ export async function depositToCaixinha(
   accountId: string,
   caixinhaId: string,
   amount: number,
+  createdBy: string,
   movementType: CaixinhaMovementType = 'guardar',
 ): Promise<void> {
   const movementRef = doc(caixinhaMovementsCollection(uid))
@@ -32,6 +33,7 @@ export async function depositToCaixinha(
       type: movementType,
       amount,
       date: todayDateString(),
+      createdBy,
     })
   })
 }
@@ -43,6 +45,7 @@ export async function withdrawFromCaixinha(
   accountId: string,
   caixinhaId: string,
   amount: number,
+  createdBy: string,
 ): Promise<void> {
   const movementRef = doc(caixinhaMovementsCollection(uid))
   await runTransaction(db, async (transaction) => {
@@ -59,6 +62,7 @@ export async function withdrawFromCaixinha(
       type: 'resgatar',
       amount: -amount,
       date: todayDateString(),
+      createdBy,
     })
   })
 }
@@ -96,15 +100,20 @@ export async function registerCaixinhaYield(
   caixinhaName: string,
   amount: number,
   categoryId: string,
+  createdBy: string,
 ): Promise<void> {
-  await createTransaction(uid, {
-    type: 'income',
-    amount,
-    date: todayDateString(),
-    description: `Rendimento — ${caixinhaName}`,
-    categoryId,
-    paid: true,
-    accountId,
-  })
-  await depositToCaixinha(uid, accountId, caixinhaId, amount, 'rendimento')
+  await createTransaction(
+    uid,
+    {
+      type: 'income',
+      amount,
+      date: todayDateString(),
+      description: `Rendimento — ${caixinhaName}`,
+      categoryId,
+      paid: true,
+      accountId,
+    },
+    createdBy,
+  )
+  await depositToCaixinha(uid, accountId, caixinhaId, amount, createdBy, 'rendimento')
 }

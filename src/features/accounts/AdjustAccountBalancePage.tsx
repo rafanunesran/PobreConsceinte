@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from './useAccounts'
 import { useCategories } from '../categories/useCategories'
 import { getOrCreateCategoryByName } from '../categories/api'
@@ -18,9 +19,10 @@ export function AdjustAccountBalancePage() {
   const navigate = useNavigate()
   const { accountId } = useParams<{ accountId: string }>()
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { accounts, loading } = useAccounts(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
+  const { accounts, loading } = useAccounts(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
   const account = accounts.find((a) => a.id === accountId)
@@ -35,7 +37,7 @@ export function AdjustAccountBalancePage() {
     [realBalance, account],
   )
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   if (!loading && !account) {
     navigate('/contas', { replace: true })
@@ -43,7 +45,7 @@ export function AdjustAccountBalancePage() {
   }
 
   async function onSubmit(data: AdjustAccountBalanceFormData) {
-    if (!user || !account) return
+    if (!user || !workspaceId || !account) return
     setFormError(null)
     const amount = roundToCents(data.realBalance - account.balance)
     if (amount === 0) {
@@ -56,22 +58,27 @@ export function AdjustAccountBalancePage() {
     const type = amount > 0 ? 'income' : 'expense'
     try {
       const categoryId = await getOrCreateCategoryByName(
-        user.uid,
+        workspaceId,
         categories,
         'Outro',
         type,
         'more',
         type === 'income' ? '#F59E0B' : '#3B82F6',
+        user.uid,
       )
-      await createTransaction(user.uid, {
-        type,
-        amount: Math.abs(amount),
-        date: todayDateString(),
-        description: 'Ajuste de saldo',
-        categoryId,
-        paid: true,
-        accountId: account.id,
-      })
+      await createTransaction(
+        workspaceId,
+        {
+          type,
+          amount: Math.abs(amount),
+          date: todayDateString(),
+          description: 'Ajuste de saldo',
+          categoryId,
+          paid: true,
+          accountId: account.id,
+        },
+        user.uid,
+      )
       navigate(`/contas/${account.id}`)
     } catch {
       setFormError('Não foi possível criar o ajuste. Tente novamente.')

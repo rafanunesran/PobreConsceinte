@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { PiggyBank, Settings } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { formatBRL } from '../../lib/utils'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useUserProfiles } from '../family/useUserProfiles'
 import type { Caixinha } from './types'
 
 interface CaixinhaCardProps {
@@ -12,6 +14,9 @@ interface CaixinhaCardProps {
 
 export function CaixinhaCard({ caixinha, accountId }: CaixinhaCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const family = useWorkspaceStore((state) => state.family)
+  const profiles = useUserProfiles(family ? [caixinha.createdBy] : [])
+  const authorName = family ? profiles.get(caixinha.createdBy)?.displayName : undefined
   const base = `/contas/${accountId}/caixinhas/${caixinha.id}`
 
   return (
@@ -86,6 +91,11 @@ export function CaixinhaCard({ caixinha, accountId }: CaixinhaCardProps) {
 
           {caixinha.yieldLabel ? (
             <p className="text-xs text-light-secondary dark:text-dark-secondary">{caixinha.yieldLabel}</p>
+          ) : null}
+          {authorName ? (
+            <p className="text-xs text-light-secondary dark:text-dark-secondary">
+              Adicionado por {authorName}
+            </p>
           ) : null}
         </Card>
       </Link>

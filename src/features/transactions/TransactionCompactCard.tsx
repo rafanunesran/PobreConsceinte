@@ -6,6 +6,8 @@ import { CATEGORY_ICON_COMPONENTS } from '../categories/types'
 import type { Category } from '../categories/types'
 import { Card } from '../../components/ui/Card'
 import { cn, formatBRL } from '../../lib/utils'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useUserProfiles } from '../family/useUserProfiles'
 import type { Transaction } from './types'
 
 interface TransactionCompactCardProps {
@@ -17,6 +19,9 @@ interface TransactionCompactCardProps {
 export function TransactionCompactCard({ transaction, category, linkedName }: TransactionCompactCardProps) {
   const Icon = category ? CATEGORY_ICON_COMPONENTS[category.icon] : Receipt
   const kind = transaction.type === 'expense' ? 'despesa' : 'receita'
+  const family = useWorkspaceStore((state) => state.family)
+  const profiles = useUserProfiles(family ? [transaction.createdBy] : [])
+  const authorName = family ? profiles.get(transaction.createdBy)?.displayName : undefined
 
   return (
     <Link to={`/registros/${kind}/${transaction.id}/editar`}>
@@ -36,6 +41,7 @@ export function TransactionCompactCard({ transaction, category, linkedName }: Tr
           <p className="truncate text-xs text-light-secondary dark:text-dark-secondary">
             {format(new Date(`${transaction.date}T00:00:00`), "d 'de' MMM", { locale: ptBR })}
             {linkedName ? ` · ${linkedName}` : ''}
+            {authorName ? ` · ${authorName}` : ''}
           </p>
           <p
             className={cn(

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useTransactions } from './useTransactions'
 import { PendingTransactionsGrid } from './PendingTransactionsGrid'
 import { MonthSelector } from '../../components/ui/MonthSelector'
@@ -11,10 +12,11 @@ import { Button } from '../../components/ui/Button'
 export function PendingTransactionsPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
-  const { transactions, loading, error } = useTransactions(user?.uid ?? '')
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const { transactions, loading, error } = useTransactions(workspaceId ?? '')
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   const pending = transactions.filter((transaction) => !transaction.paid)
 
@@ -64,7 +66,7 @@ export function PendingTransactionsPage() {
         <>
           <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
           <PendingTransactionsGrid
-            uid={user.uid}
+            uid={workspaceId}
             transactions={transactions}
             selectedMonth={selectedMonth}
           />

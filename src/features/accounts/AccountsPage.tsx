@@ -1,19 +1,22 @@
 import { Link } from 'react-router-dom'
 import { Plus, Wallet } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from './useAccounts'
 import { AccountTile } from './AccountTile'
 import { Button } from '../../components/ui/Button'
 
 export function AccountsPage() {
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
   // NOTE: hooks não podem ser condicionais — chama useAccounts sempre, com
-  // uid vazio se `user` ainda não resolveu, e só corta a renderização depois.
-  const { accounts, loading, error } = useAccounts(user?.uid ?? '')
+  // uid vazio se `user`/workspace ainda não resolveu, e só corta a
+  // renderização depois.
+  const { accounts, loading, error } = useAccounts(workspaceId ?? '')
 
   // Só renderiza atrás de <ProtectedRoute>, `user` nunca deveria ser null
   // aqui de verdade — o guard é só pro TS não reclamar.
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">

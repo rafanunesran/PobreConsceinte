@@ -6,9 +6,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Modo família: os dados sob users/{ownerId}/... continuam pertencendo
+    // ao dono (o uid que criou a família), mas qualquer uid listado em
+    // families/{ownerId}.memberIds também pode ler/escrever — get() é um
+    // lookup por ID conhecido, não uma query, então não precisa de índice.
+    function isWorkspaceMember(ownerId) {
+      return request.auth.uid == ownerId
+        || (exists(/databases/$(database)/documents/families/$(ownerId))
+            && request.auth.uid in get(/databases/$(database)/documents/families/$(ownerId)).data.memberIds);
+    }
+
+    // Tolerante a ausência: documentos criados antes deste campo existir
+    // nunca tiveram `createdBy` persistido, e uma escrita parcial (ex:
+    // confirmar pagamento, ajuste de saldo) resulta num documento final
+    // mesclado que ainda não o tem — exigir sempre o campo quebraria toda
+    // escrita nesses documentos antigos.
+    function hasValidCreatedBy() {
+      return !request.resource.data.keys().hasAny(['createdBy']) || request.resource.data.createdBy is string;
+    }
+
     match /users/{userId}/accounts/{accountId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
+      allow read, delete: if request.auth != null && isWorkspaceMember(userId);
+      allow create, update: if request.auth != null && isWorkspaceMember(userId)
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
         && request.resource.data.type in ['corrente', 'poupanca', 'carteira', 'investimento']
@@ -19,30 +38,33 @@ service cloud.firestore {
         // de saldo (ex: confirmar pagamento, ajuste de fatura, transferência)
         // resulta num documento final mesclado que ainda não o tem — exigir
         // sempre o campo quebraria toda escrita de saldo nessas contas.
-        && (!request.resource.data.keys().hasAny(['includeInTotal']) || request.resource.data.includeInTotal is bool);
+        && (!request.resource.data.keys().hasAny(['includeInTotal']) || request.resource.data.includeInTotal is bool)
+        && hasValidCreatedBy();
     }
 
     match /users/{userId}/caixinhas/{caixinhaId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
+      allow read, delete: if request.auth != null && isWorkspaceMember(userId);
+      allow create, update: if request.auth != null && isWorkspaceMember(userId)
         && request.resource.data.accountId is string
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
-        && request.resource.data.balance is number;
+        && request.resource.data.balance is number
+        && hasValidCreatedBy();
     }
 
     match /users/{userId}/caixinhaMovements/{movementId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && request.auth.uid == userId
+      allow read, delete: if request.auth != null && isWorkspaceMember(userId);
+      allow create: if request.auth != null && isWorkspaceMember(userId)
         && request.resource.data.caixinhaId is string
         && request.resource.data.type in ['guardar', 'resgatar', 'rendimento', 'ajuste']
         && request.resource.data.amount is number
-        && request.resource.data.date is string;
+        && request.resource.data.date is string
+        && hasValidCreatedBy();
     }
 
     match /users/{userId}/cards/{cardId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
+      allow read, delete: if request.auth != null && isWorkspaceMember(userId);
+      allow create, update: if request.auth != null && isWorkspaceMember(userId)
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
         && request.resource.data.brand is string
@@ -50,22 +72,24 @@ service cloud.firestore {
         && request.resource.data.closingDay is number
         && request.resource.data.closingDay >= 1 && request.resource.data.closingDay <= 31
         && request.resource.data.dueDay is number
-        && request.resource.data.dueDay >= 1 && request.resource.data.dueDay <= 31;
+        && request.resource.data.dueDay >= 1 && request.resource.data.dueDay <= 31
+        && hasValidCreatedBy();
     }
 
     match /users/{userId}/categories/{categoryId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
+      allow read, delete: if request.auth != null && isWorkspaceMember(userId);
+      allow create, update: if request.auth != null && isWorkspaceMember(userId)
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 30
         && request.resource.data.type in ['expense', 'income']
         && request.resource.data.icon is string
-        && request.resource.data.color is string;
+        && request.resource.data.color is string
+        && hasValidCreatedBy();
     }
 
     match /users/{userId}/transactions/{transactionId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
+      allow read, delete: if request.auth != null && isWorkspaceMember(userId);
+      allow create, update: if request.auth != null && isWorkspaceMember(userId)
         && request.resource.data.type in ['expense', 'income']
         && request.resource.data.amount is number && request.resource.data.amount > 0
         && request.resource.data.date is string
@@ -75,12 +99,13 @@ service cloud.firestore {
         && (
           (request.resource.data.keys().hasAny(['accountId']) && !request.resource.data.keys().hasAny(['cardId']))
           || (request.resource.data.keys().hasAny(['cardId']) && !request.resource.data.keys().hasAny(['accountId']))
-        );
+        )
+        && hasValidCreatedBy();
     }
 
     match /users/{userId}/recurringRules/{ruleId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
+      allow read, delete: if request.auth != null && isWorkspaceMember(userId);
+      allow create, update: if request.auth != null && isWorkspaceMember(userId)
         && request.resource.data.amount is number && request.resource.data.amount > 0
         && request.resource.data.description is string
         && request.resource.data.categoryId is string
@@ -90,7 +115,8 @@ service cloud.firestore {
         && (
           (request.resource.data.keys().hasAny(['accountId']) && !request.resource.data.keys().hasAny(['cardId']))
           || (request.resource.data.keys().hasAny(['cardId']) && !request.resource.data.keys().hasAny(['accountId']))
-        );
+        )
+        && hasValidCreatedBy();
     }
 
     // NOTE: escrever numa transação também escreve o `balance` da conta
@@ -101,6 +127,39 @@ service cloud.firestore {
     // precisa continuar batendo com a validação de shape já existente
     // mesmo pra contas antigas sem `includeInTotal` persistido (daí a
     // checagem tolerante a ausência nesse campo específico).
+
+    // O ID do documento é o uid de quem criou a família — permite o
+    // isWorkspaceMember() acima fazer get() direto sem query nem índice.
+    // "Código de convite" == esse mesmo ID: quem tem o código consegue dar
+    // get() neste doc específico (não list), mesmo modelo de confiança de
+    // um link compartilhável.
+    match /families/{ownerId} {
+      allow get: if request.auth != null;
+      allow list: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      allow create: if request.auth != null && request.auth.uid == ownerId
+        && request.resource.data.ownerId == ownerId
+        && request.resource.data.memberIds == [ownerId];
+      allow update: if request.auth != null && request.resource.data.ownerId == resource.data.ownerId && (
+        // Entrar: só posso adicionar o meu próprio uid, uma vez.
+        (!(request.auth.uid in resource.data.memberIds)
+          && request.resource.data.memberIds == resource.data.memberIds.concat([request.auth.uid]))
+        // Sair: só posso remover o meu próprio uid, e o dono não pode sair
+        // (não há nesta fase um fluxo de "excluir família").
+        || (request.auth.uid in resource.data.memberIds && request.auth.uid != ownerId
+          && request.resource.data.memberIds == resource.data.memberIds.removeAll([request.auth.uid]))
+      );
+    }
+
+    // Espelho público mínimo de nome/foto — o Firebase Auth não expõe dados
+    // de OUTROS usuários pro cliente, só do próprio (auth.currentUser). Só
+    // nome/e-mail/foto, não é dado sensível, por isso legível por qualquer
+    // autenticado.
+    match /userProfiles/{uid} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.displayName is string
+        && request.resource.data.email is string;
+    }
 
     match /{document=**} {
       allow read, write: if false;

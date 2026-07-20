@@ -2,13 +2,18 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCategories } from './useCategories'
 import { createCategory } from './api'
 import { CATEGORY_ICON_COMPONENTS, CATEGORY_TYPE_LABELS, SUGGESTED_CATEGORIES, type Category, type CategoryType } from './types'
 import { Button } from '../../components/ui/Button'
+import { useUserProfiles } from '../family/useUserProfiles'
 
 function CategoryChip({ category }: { category: Category }) {
   const Icon = CATEGORY_ICON_COMPONENTS[category.icon]
+  const family = useWorkspaceStore((state) => state.family)
+  const profiles = useUserProfiles(family ? [category.createdBy] : [])
+  const authorName = family ? profiles.get(category.createdBy)?.displayName : undefined
   return (
     <Link
       to={`/categorias/${category.id}/editar`}
@@ -20,7 +25,14 @@ function CategoryChip({ category }: { category: Category }) {
       >
         <Icon size={16} />
       </span>
-      <span className="text-sm text-light-primary dark:text-dark-primary">{category.name}</span>
+      <span className="flex flex-col">
+        <span className="text-sm text-light-primary dark:text-dark-primary">{category.name}</span>
+        {authorName ? (
+          <span className="text-[11px] text-light-secondary dark:text-dark-secondary">
+            {authorName}
+          </span>
+        ) : null}
+      </span>
     </Link>
   )
 }
@@ -33,6 +45,7 @@ function SuggestionSection({
   categories: Category[]
 }) {
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
   const [creating, setCreating] = useState<string | null>(null)
 
   const existingNames = new Set(categories.filter((c) => c.type === type).map((c) => c.name.toLowerCase()))
@@ -40,15 +53,15 @@ function SuggestionSection({
     (s) => s.type === type && !existingNames.has(s.name.toLowerCase()),
   )
 
-  if (!user || suggestions.length === 0) return null
+  if (!user || !workspaceId || suggestions.length === 0) return null
 
   async function handleCreate(suggestion: (typeof SUGGESTED_CATEGORIES)[number]) {
-    if (!user) return
+    if (!user || !workspaceId) return
     setCreating(suggestion.name)
     try {
       // NOTE: sem refresh manual — useCategories usa onSnapshot (tempo
       // real), a lista atualiza sozinha assim que o Firestore confirma.
-      await createCategory(user.uid, suggestion)
+      await createCategory(workspaceId, suggestion, user.uid)
     } finally {
       setCreating(null)
     }
@@ -80,9 +93,10 @@ function SuggestionSection({
 
 export function CategoriesPage() {
   const user = useAuthStore((state) => state.user)
-  const { categories, loading, error } = useCategories(user?.uid ?? '')
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const { categories, loading, error } = useCategories(workspaceId ?? '')
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">

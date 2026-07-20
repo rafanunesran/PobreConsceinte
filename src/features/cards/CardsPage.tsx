@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CreditCard as CreditCardIcon, Plus } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
 import { CardsTotalCard } from './CardsTotalCard'
@@ -12,10 +13,11 @@ import { Button } from '../../components/ui/Button'
 
 export function CardsPage() {
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
   // NOTE: hooks não podem ser condicionais — chama sempre, com uid vazio se
-  // `user` ainda não resolveu, e só corta a renderização depois.
-  const { cards, loading, error } = useCards(user?.uid ?? '')
-  const { transactions } = useTransactions(user?.uid ?? '')
+  // `user`/workspace ainda não resolveu, e só corta a renderização depois.
+  const { cards, loading, error } = useCards(workspaceId ?? '')
+  const { transactions } = useTransactions(workspaceId ?? '')
   const [periodOffset, setPeriodOffset] = useState(0)
 
   const occupiedByCard = useMemo(() => {
@@ -37,7 +39,7 @@ export function CardsPage() {
 
   // Só renderiza atrás de <ProtectedRoute>, `user` nunca deveria ser null
   // aqui de verdade — o guard é só pro TS não reclamar.
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">

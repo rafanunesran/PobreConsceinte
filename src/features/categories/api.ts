@@ -18,6 +18,7 @@ const categoryConverter: FirestoreDataConverter<Category> = {
     type: category.type,
     icon: category.icon,
     color: category.color,
+    createdBy: category.createdBy,
   }),
   fromFirestore: (snapshot: QueryDocumentSnapshot) => {
     const data = snapshot.data()
@@ -30,6 +31,7 @@ const categoryConverter: FirestoreDataConverter<Category> = {
       type,
       icon,
       color,
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
     }
   },
 }
@@ -42,8 +44,12 @@ function categoryDoc(uid: string, categoryId: string) {
   return doc(db, 'users', uid, 'categories', categoryId).withConverter(categoryConverter)
 }
 
-export async function createCategory(uid: string, data: CategoryFormData): Promise<string> {
-  const ref = await addDoc(categoriesCollection(uid), { id: '', ...data })
+export async function createCategory(
+  uid: string,
+  data: CategoryFormData,
+  createdBy: string,
+): Promise<string> {
+  const ref = await addDoc(categoriesCollection(uid), { id: '', createdBy, ...data })
   return ref.id
 }
 
@@ -74,8 +80,9 @@ export async function getOrCreateCategoryByName(
   type: CategoryType,
   icon: CategoryIcon,
   color: CategoryColor,
+  createdBy: string,
 ): Promise<string> {
   const existing = categories.find((c) => c.type === type && c.name === name)
   if (existing) return existing.id
-  return createCategory(uid, { name, type, icon, color })
+  return createCategory(uid, { name, type, icon, color }, createdBy)
 }

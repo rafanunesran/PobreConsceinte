@@ -23,6 +23,7 @@ const accountConverter: FirestoreDataConverter<Account> = {
     balance: account.balance,
     currency: account.currency,
     includeInTotal: account.includeInTotal,
+    createdBy: account.createdBy,
   }),
   fromFirestore: (snapshot: QueryDocumentSnapshot) => {
     const data = snapshot.data()
@@ -36,6 +37,10 @@ const accountConverter: FirestoreDataConverter<Account> = {
       // NOTE: doc pré-existente sem o campo degrada pra `true` — não
       // regride contas já criadas antes desta mudança.
       includeInTotal: typeof data.includeInTotal === 'boolean' ? data.includeInTotal : true,
+      // NOTE: doc pré-existente sem o campo (antes do modo família)
+      // degrada pra string vazia — nunca quebra, só não tem autor pra
+      // mostrar na UI.
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
     }
   },
 }
@@ -48,8 +53,8 @@ export function accountDoc(uid: string, accountId: string) {
   return doc(db, 'users', uid, 'accounts', accountId).withConverter(accountConverter)
 }
 
-export async function createAccount(uid: string, data: AccountFormData): Promise<void> {
-  await addDoc(accountsCollection(uid), { id: '', currency: 'BRL', ...data })
+export async function createAccount(uid: string, data: AccountFormData, createdBy: string): Promise<void> {
+  await addDoc(accountsCollection(uid), { id: '', currency: 'BRL', createdBy, ...data })
 }
 
 export async function updateAccount(

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCaixinhas } from './useCaixinhas'
 import { adjustCaixinhaBalance } from './api'
 import { caixinhaAdjustSchema, type CaixinhaAdjustFormData } from './schemas'
@@ -15,8 +16,9 @@ export function CaixinhaAdjustPage() {
   const navigate = useNavigate()
   const { accountId, caixinhaId } = useParams<{ accountId: string; caixinhaId: string }>()
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { caixinhas, loading } = useCaixinhas(user?.uid ?? '', accountId ?? '')
+  const { caixinhas, loading } = useCaixinhas(workspaceId ?? '', accountId ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
   const caixinha = caixinhas.find((c) => c.id === caixinhaId)
@@ -31,7 +33,7 @@ export function CaixinhaAdjustPage() {
     [realBalance, caixinha],
   )
 
-  if (!user || !accountId || !caixinhaId) return null
+  if (!user || !workspaceId || !accountId || !caixinhaId) return null
 
   if (!loading && !caixinha) {
     navigate(`/contas/${accountId}`, { replace: true })
@@ -39,11 +41,11 @@ export function CaixinhaAdjustPage() {
   }
 
   async function onSubmit(data: CaixinhaAdjustFormData) {
-    if (!user || !caixinhaId || !caixinha) return
+    if (!user || !workspaceId || !caixinhaId || !caixinha) return
     setFormError(null)
     const diff = roundToCents(data.realBalance - caixinha.balance)
     try {
-      await adjustCaixinhaBalance(user.uid, caixinhaId, data.realBalance, diff)
+      await adjustCaixinhaBalance(workspaceId, caixinhaId, data.realBalance, diff, user.uid)
       navigate(`/contas/${accountId}`)
     } catch {
       setFormError('Não foi possível ajustar o saldo. Tente novamente.')

@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ArrowLeft, ChevronLeft, ChevronRight, Receipt, Settings } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
 import { useCategories } from '../categories/useCategories'
@@ -19,6 +20,7 @@ import {
 import { CARD_BRAND_LABELS } from './types'
 import { Button } from '../../components/ui/Button'
 import { formatBRL } from '../../lib/utils'
+import { useUserProfiles } from '../family/useUserProfiles'
 
 function formatDisplayDate(date: string): string {
   return format(new Date(`${date}T00:00:00`), "d 'de' MMM", { locale: ptBR })
@@ -28,14 +30,18 @@ export function CardInvoicePage() {
   const navigate = useNavigate()
   const { cardId } = useParams<{ cardId: string }>()
   const user = useAuthStore((state) => state.user)
-  const { cards, loading: loadingCards } = useCards(user?.uid ?? '')
-  const { transactions, loading: loadingTransactions } = useTransactions(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const family = useWorkspaceStore((state) => state.family)
+  const { cards, loading: loadingCards } = useCards(workspaceId ?? '')
+  const { transactions, loading: loadingTransactions } = useTransactions(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
   const [periodOffset, setPeriodOffset] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const card = cards.find((c) => c.id === cardId)
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+  const profiles = useUserProfiles(family && card ? [card.createdBy] : [])
+  const authorName = family && card ? profiles.get(card.createdBy)?.displayName : undefined
 
   const period = useMemo(() => {
     if (!card) return null
@@ -51,7 +57,7 @@ export function CardInvoicePage() {
   const owed = useMemo(() => sumUnpaid(periodTransactions), [periodTransactions])
   const dueDate = card && period ? getDueDate(period.end, card.dueDay) : null
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   if (!loadingCards && !card) {
     navigate('/cartoes', { replace: true })
@@ -76,6 +82,7 @@ export function CardInvoicePage() {
           {card ? (
             <p className="text-sm text-light-secondary dark:text-dark-secondary">
               {CARD_BRAND_LABELS[card.brand]}
+              {authorName ? ` · Adicionado por ${authorName}` : ''}
             </p>
           ) : null}
         </div>

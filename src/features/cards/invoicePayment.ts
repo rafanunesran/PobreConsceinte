@@ -17,6 +17,7 @@ export interface PayCardInvoiceParams {
   // conhecidas, não dá pra rodar uma query nova no meio da transação.
   unpaidTransactionIds: string[]
   nextPeriodStart: string // nextInvoicePeriod(...).start
+  createdBy: string
 }
 
 export interface PayCardInvoiceResult {
@@ -96,6 +97,7 @@ export async function payCardInvoice(
       categoryId: params.categoryId,
       paid: true,
       accountId: params.accountId,
+      createdBy: params.createdBy,
     })
 
     const remaining = roundToCents(owed - params.amountPaid)
@@ -109,6 +111,7 @@ export async function payCardInvoice(
         categoryId: params.categoryId,
         paid: false,
         cardId: params.cardId,
+        createdBy: params.createdBy,
       })
       return rolloverRef.id
     }

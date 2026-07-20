@@ -3,12 +3,18 @@ import { Settings } from 'lucide-react'
 import { ACCOUNT_TYPE_LABELS, type Account } from './types'
 import { Card } from '../../components/ui/Card'
 import { formatBRL } from '../../lib/utils'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { useUserProfiles } from '../family/useUserProfiles'
 
 interface AccountTileProps {
   account: Account
 }
 
 export function AccountTile({ account }: AccountTileProps) {
+  const family = useWorkspaceStore((state) => state.family)
+  const profiles = useUserProfiles(family ? [account.createdBy] : [])
+  const authorName = family ? profiles.get(account.createdBy)?.displayName : undefined
+
   return (
     <div className="relative">
       <Link
@@ -29,6 +35,11 @@ export function AccountTile({ account }: AccountTileProps) {
           <p className="mt-3 text-xl font-semibold text-light-primary dark:text-dark-primary">
             {formatBRL(account.balance)}
           </p>
+          {authorName ? (
+            <p className="mt-1 text-xs text-light-secondary dark:text-dark-secondary">
+              Adicionado por {authorName}
+            </p>
+          ) : null}
         </Card>
       </Link>
     </div>

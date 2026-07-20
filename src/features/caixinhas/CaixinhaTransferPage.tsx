@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from '../accounts/useAccounts'
 import { useCaixinhas } from './useCaixinhas'
 import { depositToCaixinha, withdrawFromCaixinha } from './caixinhaTransfers'
@@ -17,9 +18,10 @@ export function CaixinhaTransferPage() {
   const [searchParams] = useSearchParams()
   const direction = searchParams.get('direction') === 'resgatar' ? 'resgatar' : 'guardar'
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { accounts, loading: loadingAccounts } = useAccounts(user?.uid ?? '')
-  const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(user?.uid ?? '', accountId ?? '')
+  const { accounts, loading: loadingAccounts } = useAccounts(workspaceId ?? '')
+  const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(workspaceId ?? '', accountId ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
   const account = accounts.find((a) => a.id === accountId)
@@ -33,7 +35,7 @@ export function CaixinhaTransferPage() {
     defaultValues: { amount: 0 },
   })
 
-  if (!user || !accountId || !caixinhaId) return null
+  if (!user || !workspaceId || !accountId || !caixinhaId) return null
 
   if (!loading && (!account || !caixinha)) {
     navigate(`/contas/${accountId ?? ''}`, { replace: true })
@@ -41,7 +43,7 @@ export function CaixinhaTransferPage() {
   }
 
   async function onSubmit(data: CaixinhaTransferFormData) {
-    if (!user || !account || !caixinha) return
+    if (!user || !workspaceId || !account || !caixinha) return
     setFormError(null)
     if (data.amount > teto) {
       setFormError(
@@ -53,9 +55,9 @@ export function CaixinhaTransferPage() {
     }
     try {
       if (direction === 'guardar') {
-        await depositToCaixinha(user.uid, account.id, caixinha.id, data.amount)
+        await depositToCaixinha(workspaceId, account.id, caixinha.id, data.amount, user.uid)
       } else {
-        await withdrawFromCaixinha(user.uid, account.id, caixinha.id, data.amount)
+        await withdrawFromCaixinha(workspaceId, account.id, caixinha.id, data.amount, user.uid)
       }
       navigate(`/contas/${account.id}`)
     } catch {

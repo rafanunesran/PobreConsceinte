@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from './useAccounts'
 import { transferBetweenAccounts } from './accountTransfers'
 import { accountTransferSchema, type AccountTransferFormData } from './schemas'
@@ -16,8 +17,9 @@ export function AccountTransferPage() {
   const [searchParams] = useSearchParams()
   const fromParam = searchParams.get('from') ?? ''
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { accounts, loading } = useAccounts(user?.uid ?? '')
+  const { accounts, loading } = useAccounts(workspaceId ?? '')
   const [formError, setFormError] = useState<string | null>(null)
 
   const form = useForm<AccountTransferFormData>({
@@ -32,10 +34,10 @@ export function AccountTransferPage() {
   const fromAccountId = form.watch('fromAccountId')
   const fromAccount = accounts.find((a) => a.id === fromAccountId)
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   async function onSubmit(data: AccountTransferFormData) {
-    if (!user) return
+    if (!workspaceId) return
     setFormError(null)
     const source = accounts.find((a) => a.id === data.fromAccountId)
     if (source && data.amount > source.balance) {
@@ -43,7 +45,7 @@ export function AccountTransferPage() {
       return
     }
     try {
-      await transferBetweenAccounts(user.uid, data.fromAccountId, data.toAccountId, data.amount)
+      await transferBetweenAccounts(workspaceId, data.fromAccountId, data.toAccountId, data.amount)
       navigate(fromParam ? `/contas/${fromParam}` : '/contas')
     } catch {
       setFormError('Não foi possível concluir a transferência. Tente novamente.')

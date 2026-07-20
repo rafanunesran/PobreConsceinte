@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, MoreHorizontal, Plus, Receipt } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from '../accounts/useAccounts'
 import { useTransactions } from '../transactions/useTransactions'
 import { BalanceteCard } from '../transactions/BalanceteCard'
@@ -21,9 +22,10 @@ const quickActions = [
 
 export function HomePage() {
   const user = useAuthStore((state) => state.user)
-  const { accounts, loading } = useAccounts(user?.uid ?? '')
-  const { transactions } = useTransactions(user?.uid ?? '')
-  const { cards } = useCards(user?.uid ?? '')
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const { accounts, loading } = useAccounts(workspaceId ?? '')
+  const { transactions } = useTransactions(workspaceId ?? '')
+  const { cards } = useCards(workspaceId ?? '')
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
   const [invoicePeriodOffset, setInvoicePeriodOffset] = useState(0)
 
@@ -32,7 +34,7 @@ export function HomePage() {
     [cards, transactions, invoicePeriodOffset],
   )
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   const totalBalance = accounts
     .filter((account) => account.includeInTotal)

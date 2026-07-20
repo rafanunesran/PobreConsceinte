@@ -15,6 +15,7 @@ export interface Transaction {
   installmentGroupId?: string // presente sse parte de um parcelamento
   installmentIndex?: number // 1-based
   installmentTotal?: number
+  createdBy: string // uid de quem criou — nunca alterado em updates
 }
 
 export interface TransactionFormData {

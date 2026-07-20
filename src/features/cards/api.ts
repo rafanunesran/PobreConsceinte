@@ -21,6 +21,7 @@ const cardConverter: FirestoreDataConverter<CreditCard> = {
     limit: card.limit,
     closingDay: card.closingDay,
     dueDay: card.dueDay,
+    createdBy: card.createdBy,
   }),
   fromFirestore: (snapshot: QueryDocumentSnapshot) => {
     const data = snapshot.data()
@@ -32,6 +33,7 @@ const cardConverter: FirestoreDataConverter<CreditCard> = {
       limit: typeof data.limit === 'number' ? data.limit : 0,
       closingDay: typeof data.closingDay === 'number' ? data.closingDay : 1,
       dueDay: typeof data.dueDay === 'number' ? data.dueDay : 1,
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
     }
   },
 }
@@ -44,8 +46,8 @@ function cardDoc(uid: string, cardId: string) {
   return doc(db, 'users', uid, 'cards', cardId).withConverter(cardConverter)
 }
 
-export async function createCard(uid: string, data: CardFormData): Promise<void> {
-  await addDoc(cardsCollection(uid), { id: '', ...data })
+export async function createCard(uid: string, data: CardFormData, createdBy: string): Promise<void> {
+  await addDoc(cardsCollection(uid), { id: '', createdBy, ...data })
 }
 
 export async function updateCard(uid: string, cardId: string, data: CardFormData): Promise<void> {

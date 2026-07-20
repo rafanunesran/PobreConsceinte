@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
-import { LogOut, Moon, Sun, Tag, Trash2 } from 'lucide-react'
+import { LogOut, Moon, Sun, Tag, Trash2, Users } from 'lucide-react'
 import { auth } from '../../lib/firebase'
 import { useAuthStore } from '../../stores/authStore'
 import { useThemeStore } from '../../stores/themeStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -17,6 +18,8 @@ export function PerfilPage() {
   const user = useAuthStore((state) => state.user)
   const theme = useThemeStore((state) => state.theme)
   const toggleTheme = useThemeStore((state) => state.toggleTheme)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const family = useWorkspaceStore((state) => state.family)
 
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [confirmText, setConfirmText] = useState('')
@@ -28,11 +31,11 @@ export function PerfilPage() {
   if (!user) return null
 
   async function handleReset() {
-    if (!user) return
+    if (!user || !workspaceId) return
     setIsResetting(true)
     setResetError(null)
     try {
-      await resetUserData(user.uid)
+      await resetUserData(workspaceId)
       navigate('/')
     } catch {
       setResetError('Não foi possível zerar os dados. Tente novamente.')
@@ -63,6 +66,13 @@ export function PerfilPage() {
           </Button>
         </Link>
 
+        <Link to="/familia">
+          <Button variant="secondary" className="w-full">
+            <Users size={20} />
+            Família
+          </Button>
+        </Link>
+
         <Button variant="secondary" onClick={toggleTheme}>
           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
@@ -78,8 +88,11 @@ export function PerfilPage() {
         {confirmingReset ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-danger">
-              Isso apaga TODOS os seus dados (contas, cartões, categorias, transações e
-              caixinhas) para sempre. Não pode ser desfeito.
+              Isso apaga TODOS os dados (contas, cartões, categorias, transações e caixinhas)
+              para sempre. Não pode ser desfeito.
+              {family
+                ? ` Isso afeta TODOS os ${family.memberIds.length} membros da família, não só você.`
+                : ''}
             </p>
             <Input
               label={`Digite "${RESET_CONFIRM_WORD}" para confirmar`}

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from '../accounts/useAccounts'
 import { useCards } from '../cards/useCards'
 import { useCategories } from '../categories/useCategories'
@@ -28,10 +29,11 @@ export function TransactionFormPage() {
   const isExpense = kind === 'despesa'
   const isEditMode = Boolean(transactionId)
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { accounts } = useAccounts(user?.uid ?? '')
-  const { cards } = useCards(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
+  const { accounts } = useAccounts(workspaceId ?? '')
+  const { cards } = useCards(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
   const relevantCategories = categories.filter((c) => c.type === (isExpense ? 'expense' : 'income'))
 
   const [formError, setFormError] = useState<string | null>(null)
@@ -62,9 +64,9 @@ export function TransactionFormPage() {
   })
 
   useEffect(() => {
-    if (!user || !transactionId) return
+    if (!workspaceId || !transactionId) return
     let cancelled = false
-    getTransaction(user.uid, transactionId)
+    getTransaction(workspaceId, transactionId)
       .then((transaction) => {
         if (cancelled) return
         if (!transaction) {
@@ -105,12 +107,12 @@ export function TransactionFormPage() {
     return () => {
       cancelled = true
     }
-  }, [user, transactionId, isExpense, navigate, expenseForm, incomeForm])
+  }, [workspaceId, transactionId, isExpense, navigate, expenseForm, incomeForm])
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   async function onSubmitExpense(data: ExpenseFormData) {
-    if (!user) return
+    if (!user || !workspaceId) return
     setFormError(null)
     const linkage =
       data.linkedType === 'account' ? { accountId: data.accountId } : { cardId: data.cardId }
@@ -133,10 +135,10 @@ export function TransactionFormPage() {
           paid: data.paid,
           ...linkage,
         }
-        await updateTransaction(user.uid, transactionId, payload)
+        await updateTransaction(workspaceId, transactionId, payload)
       } else if (data.recurrence === 'fixed') {
         await createRecurringExpense(
-          user.uid,
+          workspaceId,
           {
             amount: data.amount,
             description: data.description,
@@ -145,14 +147,16 @@ export function TransactionFormPage() {
             ...linkage,
           },
           paidOnCreate,
+          user.uid,
         )
       } else if (data.recurrence === 'installments') {
         await createInstallmentExpense(
-          user.uid,
+          workspaceId,
           { amount: data.amount, description: data.description, categoryId: data.categoryId, date: data.date, ...linkage },
           data.installmentsCount ?? 2,
           data.installmentAmountMode === 'perInstallment',
           paidOnCreate,
+          user.uid,
         )
       } else {
         const payload: TransactionFormData = {
@@ -164,7 +168,7 @@ export function TransactionFormPage() {
           paid: paidOnCreate,
           ...linkage,
         }
-        await createTransaction(user.uid, payload)
+        await createTransaction(workspaceId, payload, user.uid)
       }
       navigate('/registros')
     } catch {
@@ -173,7 +177,7 @@ export function TransactionFormPage() {
   }
 
   async function onSubmitIncome(data: IncomeFormData) {
-    if (!user) return
+    if (!user || !workspaceId) return
     setFormError(null)
     const payload: TransactionFormData = {
       type: 'income',
@@ -186,9 +190,9 @@ export function TransactionFormPage() {
     }
     try {
       if (transactionId) {
-        await updateTransaction(user.uid, transactionId, payload)
+        await updateTransaction(workspaceId, transactionId, payload)
       } else {
-        await createTransaction(user.uid, payload)
+        await createTransaction(workspaceId, payload, user.uid)
       }
       navigate('/registros')
     } catch {
@@ -197,10 +201,10 @@ export function TransactionFormPage() {
   }
 
   async function handleDelete() {
-    if (!user || !transactionId) return
+    if (!workspaceId || !transactionId) return
     setIsDeleting(true)
     try {
-      await deleteTransaction(user.uid, transactionId)
+      await deleteTransaction(workspaceId, transactionId)
       navigate('/registros')
     } catch {
       setFormError('Não foi possível excluir. Tente novamente.')

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Settings } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useAccounts } from './useAccounts'
 import { useTransactions } from '../transactions/useTransactions'
 import { useCategories } from '../categories/useCategories'
@@ -14,25 +15,30 @@ import { currentYearMonth } from '../transactions/dateUtils'
 import { ACCOUNT_TYPE_LABELS } from './types'
 import { Button } from '../../components/ui/Button'
 import { formatBRL } from '../../lib/utils'
+import { useUserProfiles } from '../family/useUserProfiles'
 
 export function AccountDetailPage() {
   const navigate = useNavigate()
   const { accountId } = useParams<{ accountId: string }>()
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
+  const family = useWorkspaceStore((state) => state.family)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
-  const { accounts, loading: loadingAccounts } = useAccounts(user?.uid ?? '')
-  const { transactions } = useTransactions(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
-  const { cards } = useCards(user?.uid ?? '')
+  const { accounts, loading: loadingAccounts } = useAccounts(workspaceId ?? '')
+  const { transactions } = useTransactions(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
+  const { cards } = useCards(workspaceId ?? '')
   const {
     caixinhas,
     loading: loadingCaixinhas,
     error: caixinhasError,
-  } = useCaixinhas(user?.uid ?? '', accountId ?? '')
+  } = useCaixinhas(workspaceId ?? '', accountId ?? '')
 
   const account = accounts.find((a) => a.id === accountId)
+  const profiles = useUserProfiles(family && account ? [account.createdBy] : [])
+  const authorName = family && account ? profiles.get(account.createdBy)?.displayName : undefined
 
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
@@ -43,7 +49,7 @@ export function AccountDetailPage() {
     [transactions, accountId],
   )
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   if (!loadingAccounts && !account) {
     navigate('/contas', { replace: true })
@@ -68,6 +74,7 @@ export function AccountDetailPage() {
           {account ? (
             <p className="text-sm text-light-secondary dark:text-dark-secondary">
               {ACCOUNT_TYPE_LABELS[account.type]} · {formatBRL(account.balance)}
+              {authorName ? ` · Adicionado por ${authorName}` : ''}
             </p>
           ) : null}
         </div>

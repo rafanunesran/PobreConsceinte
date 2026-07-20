@@ -215,6 +215,13 @@ export const router = createBrowserRouter(
             return { Component: PerfilPage }
           },
         },
+        {
+          path: 'familia',
+          lazy: async () => {
+            const { FamilyPage } = await import('./features/family/FamilyPage')
+            return { Component: FamilyPage }
+          },
+        },
       ],
     },
   ],

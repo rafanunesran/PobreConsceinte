@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
 import { useAccounts } from '../accounts/useAccounts'
@@ -28,11 +29,12 @@ export function PayCardInvoicePage() {
   const [searchParams] = useSearchParams()
   const periodOffset = Number(searchParams.get('offset')) || 0
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
-  const { cards, loading: loadingCards } = useCards(user?.uid ?? '')
-  const { transactions, loading: loadingTransactions } = useTransactions(user?.uid ?? '')
-  const { accounts } = useAccounts(user?.uid ?? '')
-  const { categories } = useCategories(user?.uid ?? '')
+  const { cards, loading: loadingCards } = useCards(workspaceId ?? '')
+  const { transactions, loading: loadingTransactions } = useTransactions(workspaceId ?? '')
+  const { accounts } = useAccounts(workspaceId ?? '')
+  const { categories } = useCategories(workspaceId ?? '')
 
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -70,7 +72,7 @@ export function PayCardInvoicePage() {
     }
   }, [loading, card, owed, navigate])
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   if (!loading && !card) {
     navigate('/cartoes', { replace: true })
@@ -78,20 +80,21 @@ export function PayCardInvoicePage() {
   }
 
   async function onSubmit(data: PayInvoiceFormData) {
-    if (!user || !card || !period) return
+    if (!user || !workspaceId || !card || !period) return
     setFormError(null)
     try {
       // categoria fixa ("Outro") — o pagamento só unifica compras que já
       // têm sua própria categoria, não faz sentido pedir uma nova aqui.
       const categoryId = await getOrCreateCategoryByName(
-        user.uid,
+        workspaceId,
         categories,
         'Outro',
         'expense',
         'more',
         '#3B82F6',
+        user.uid,
       )
-      await payCardInvoice(user.uid, {
+      await payCardInvoice(workspaceId, {
         cardId: card.id,
         cardName: card.name,
         accountId: data.accountId,
@@ -100,6 +103,7 @@ export function PayCardInvoicePage() {
         paymentDate: todayDateString(),
         unpaidTransactionIds: unpaidPeriodTransactions.map((t) => t.id),
         nextPeriodStart: nextInvoicePeriod(card.closingDay, period).start,
+        createdBy: user.uid,
       })
       navigate(`/cartoes/${card.id}/fatura`)
     } catch {

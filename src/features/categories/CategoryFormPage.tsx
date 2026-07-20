@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Check } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { cn } from '../../lib/utils'
@@ -22,6 +23,7 @@ export function CategoryFormPage() {
   const { categoryId } = useParams<{ categoryId?: string }>()
   const isEditMode = Boolean(categoryId)
   const user = useAuthStore((state) => state.user)
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId)
 
   const [formError, setFormError] = useState<string | null>(null)
   const [isLoadingCategory, setIsLoadingCategory] = useState(isEditMode)
@@ -35,9 +37,9 @@ export function CategoryFormPage() {
   })
 
   useEffect(() => {
-    if (!user || !categoryId) return
+    if (!workspaceId || !categoryId) return
     let cancelled = false
-    getCategory(user.uid, categoryId)
+    getCategory(workspaceId, categoryId)
       .then((category) => {
         if (cancelled) return
         if (!category) {
@@ -55,18 +57,18 @@ export function CategoryFormPage() {
     return () => {
       cancelled = true
     }
-  }, [user, categoryId, form, navigate])
+  }, [workspaceId, categoryId, form, navigate])
 
-  if (!user) return null
+  if (!user || !workspaceId) return null
 
   async function onSubmit(data: CategoryFormData) {
-    if (!user) return
+    if (!user || !workspaceId) return
     setFormError(null)
     try {
       if (categoryId) {
-        await updateCategory(user.uid, categoryId, data)
+        await updateCategory(workspaceId, categoryId, data)
       } else {
-        await createCategory(user.uid, data)
+        await createCategory(workspaceId, data, user.uid)
       }
       navigate('/categorias')
     } catch {
@@ -75,10 +77,10 @@ export function CategoryFormPage() {
   }
 
   async function handleDelete() {
-    if (!user || !categoryId) return
+    if (!workspaceId || !categoryId) return
     setIsDeleting(true)
     try {
-      await deleteCategory(user.uid, categoryId)
+      await deleteCategory(workspaceId, categoryId)
       navigate('/categorias')
     } catch {
       setFormError('Não foi possível excluir a categoria. Tente novamente.')

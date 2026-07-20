@@ -22,6 +22,7 @@ export interface RecurringRule {
   generatedUntil: string // 'YYYY-MM-DD' da última ocorrência já gerada
   accountId?: string
   cardId?: string
+  createdBy: string // uid de quem criou a regra — ocorrências geradas por topUp herdam este valor
 }
 
 export interface RecurringRuleFormData {
@@ -41,6 +42,7 @@ const recurringRuleConverter: FirestoreDataConverter<RecurringRule> = {
       categoryId: r.categoryId,
       dayOfMonth: r.dayOfMonth,
       generatedUntil: r.generatedUntil,
+      createdBy: r.createdBy,
     }
     return r.accountId !== undefined ? { ...base, accountId: r.accountId } : { ...base, cardId: r.cardId }
   },
@@ -55,6 +57,7 @@ const recurringRuleConverter: FirestoreDataConverter<RecurringRule> = {
       categoryId: typeof data.categoryId === 'string' ? data.categoryId : '',
       dayOfMonth: typeof data.dayOfMonth === 'number' ? data.dayOfMonth : 1,
       generatedUntil: typeof data.generatedUntil === 'string' ? data.generatedUntil : '',
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
       ...(accountId !== undefined ? { accountId } : {}),
       ...(cardId !== undefined ? { cardId } : {}),
     }
@@ -122,6 +125,7 @@ export async function createRecurringExpense(
   uid: string,
   data: RecurringRuleFormData,
   firstOccurrencePaid: boolean,
+  createdBy: string,
 ): Promise<string> {
   if ((data.accountId !== undefined) === (data.cardId !== undefined)) {
     throw new Error('A regra recorrente deve estar vinculada a exatamente uma conta ou um cartão.')
@@ -158,7 +162,7 @@ export async function createRecurringExpense(
 
     for (const occurrence of occurrences) {
       const txId = `${ruleRef.id}_${occurrence.date}`
-      transaction.set(transactionDoc(uid, txId), { id: txId, ...occurrence })
+      transaction.set(transactionDoc(uid, txId), { id: txId, createdBy, ...occurrence })
     }
 
     transaction.set(ruleRef, {
@@ -168,6 +172,7 @@ export async function createRecurringExpense(
       categoryId: data.categoryId,
       dayOfMonth: data.dayOfMonth,
       generatedUntil: lastOccurrence.date,
+      createdBy,
       ...(data.accountId !== undefined ? { accountId: data.accountId } : { cardId: data.cardId }),
     })
   })
@@ -204,7 +209,9 @@ export async function topUpRecurringRules(uid: string): Promise<void> {
     const batch = writeBatch(db)
     for (const occurrence of newOccurrences) {
       const txId = `${rule.id}_${occurrence.date}`
-      batch.set(transactionDoc(uid, txId), { id: txId, ...occurrence })
+      // ocorrências geradas automaticamente herdam a autoria de quem
+      // criou a regra — não há uma "pessoa agindo agora" pra atribuir.
+      batch.set(transactionDoc(uid, txId), { id: txId, createdBy: rule.createdBy, ...occurrence })
     }
     batch.set(recurringRuleDoc(uid, rule.id), { ...rule, generatedUntil: lastOccurrence.date })
     await batch.commit()
