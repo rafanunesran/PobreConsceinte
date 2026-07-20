@@ -232,6 +232,16 @@ export async function deleteTransaction(uid: string, transactionId: string): Pro
   })
 }
 
+// Sequencial, não Promise.all — mesmo motivo de confirmMany em
+// useConfirmPending.ts: evita várias runTransaction concorrentes (cada
+// deleteTransaction abre uma) que forçariam retries do Firestore. O que já
+// foi apagado fica apagado se um erro no meio interromper o resto.
+export async function deleteManyTransactions(uid: string, transactionIds: string[]): Promise<void> {
+  for (const id of transactionIds) {
+    await deleteTransaction(uid, id)
+  }
+}
+
 export async function getTransaction(uid: string, transactionId: string): Promise<Transaction | null> {
   const snapshot = await getDoc(transactionDoc(uid, transactionId))
   return snapshot.exists() ? snapshot.data() : null

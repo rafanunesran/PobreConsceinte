@@ -37,29 +37,45 @@ export function buildCategorySuggester(
     expense: [],
     income: [],
   }
+  // Todo categoryId já usado nesse tipo, sem distinção de descrição — só
+  // pra achar a categoria mais usada em geral, o fallback quando não há
+  // nenhum sinal melhor (ver abaixo).
+  const allByType: Record<TransactionType, string[]> = { expense: [], income: [] }
+
   for (const t of history) {
-    if (!t.categoryId || !t.description) continue
+    if (!t.categoryId) continue
+    allByType[t.type].push(t.categoryId)
+    if (!t.description) continue
     const normalized = normalize(t.description)
     if (!normalized) continue
     byType[t.type].push({ normalized, categoryId: t.categoryId })
   }
 
+  const fallbackByType: Record<TransactionType, string | undefined> = {
+    expense: allByType.expense.length > 0 ? mostFrequent(allByType.expense) : undefined,
+    income: allByType.income.length > 0 ? mostFrequent(allByType.income) : undefined,
+  }
+
   return (description, type) => {
     const norm = normalize(description)
-    if (!norm) return undefined
     const candidates = byType[type]
 
-    const exact = candidates.filter((c) => c.normalized === norm)
-    if (exact.length > 0) return mostFrequent(exact.map((c) => c.categoryId))
+    if (norm) {
+      const exact = candidates.filter((c) => c.normalized === norm)
+      if (exact.length > 0) return mostFrequent(exact.map((c) => c.categoryId))
 
-    // contém/está contido — pega o item já categorizado mais frequente
-    // entre os que compartilham um trecho significativo com a descrição
-    // nova (ex: "uber" dentro de "uber trip help uber com").
-    const contains = candidates.filter(
-      (c) => c.normalized.length >= 3 && (norm.includes(c.normalized) || c.normalized.includes(norm)),
-    )
-    if (contains.length > 0) return mostFrequent(contains.map((c) => c.categoryId))
+      // contém/está contido — pega o item já categorizado mais frequente
+      // entre os que compartilham um trecho significativo com a descrição
+      // nova (ex: "uber" dentro de "uber trip help uber com").
+      const contains = candidates.filter(
+        (c) => c.normalized.length >= 3 && (norm.includes(c.normalized) || c.normalized.includes(norm)),
+      )
+      if (contains.length > 0) return mostFrequent(contains.map((c) => c.categoryId))
+    }
 
-    return undefined
+    // Sem nenhum sinal específico: pré-seleciona a categoria mais usada
+    // nesse tipo em geral, em vez de deixar em branco — a pessoa ainda
+    // pode trocar na revisão, mas raramente vai precisar escolher do zero.
+    return fallbackByType[type]
   }
 }

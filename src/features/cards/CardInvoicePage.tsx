@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, ChevronLeft, ChevronRight, Receipt, Settings } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ListChecks, Receipt, Settings, X } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useCards } from './useCards'
 import { useTransactions } from '../transactions/useTransactions'
 import { useCategories } from '../categories/useCategories'
+import { deleteManyTransactions } from '../transactions/api'
 import { TransactionCompactCard } from '../transactions/TransactionCompactCard'
 import {
   getDueDate,
@@ -37,6 +38,10 @@ export function CardInvoicePage() {
   const { categories } = useCategories(workspaceId ?? '')
   const [periodOffset, setPeriodOffset] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const card = cards.find((c) => c.id === cardId)
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -56,6 +61,36 @@ export function CardInvoicePage() {
 
   const owed = useMemo(() => sumUnpaid(periodTransactions), [periodTransactions])
   const dueDate = card && period ? getDueDate(period.end, card.dueDay) : null
+
+  function toggleSelectMode() {
+    setSelectMode((mode) => !mode)
+    setSelectedIds(new Set())
+    setDeleteError(null)
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleDeleteSelected() {
+    if (!workspaceId || selectedIds.size === 0) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteManyTransactions(workspaceId, Array.from(selectedIds))
+      setSelectMode(false)
+      setSelectedIds(new Set())
+    } catch {
+      setDeleteError('Não foi possível apagar tudo. O que já foi apagado continua apagado — tente de novo.')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   if (!user || !workspaceId) return null
 
@@ -187,16 +222,46 @@ export function CardInvoicePage() {
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              {periodTransactions.map((transaction) => (
-                <TransactionCompactCard
-                  key={transaction.id}
-                  transaction={transaction}
-                  category={categoriesById.get(transaction.categoryId)}
-                  linkedName={undefined}
-                />
-              ))}
-            </div>
+            <>
+              <div className="flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={toggleSelectMode}
+                  className="flex items-center gap-1.5 text-xs text-light-secondary transition-colors duration-200 hover:text-light-primary dark:text-dark-secondary dark:hover:text-dark-primary"
+                >
+                  {selectMode ? <X size={14} /> : <ListChecks size={14} />}
+                  {selectMode ? 'Cancelar seleção' : 'Selecionar'}
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {periodTransactions.map((transaction) => (
+                  <TransactionCompactCard
+                    key={transaction.id}
+                    transaction={transaction}
+                    category={categoriesById.get(transaction.categoryId)}
+                    linkedName={undefined}
+                    selectMode={selectMode}
+                    selected={selectedIds.has(transaction.id)}
+                    onToggleSelect={() => toggleSelected(transaction.id)}
+                  />
+                ))}
+              </div>
+
+              {selectMode ? (
+                <div className="flex flex-col gap-2 rounded-2xl border border-border-light bg-surface-light p-3 dark:border-border-dark dark:bg-surface-dark-elevated">
+                  {deleteError ? <p className="text-sm text-danger">{deleteError}</p> : null}
+                  <Button
+                    type="button"
+                    className="w-full bg-danger hover:bg-danger hover:shadow-none"
+                    disabled={selectedIds.size === 0 || deleting}
+                    onClick={handleDeleteSelected}
+                  >
+                    {deleting ? 'Apagando...' : `Apagar ${selectedIds.size} selecionado(s)`}
+                  </Button>
+                </div>
+              ) : null}
+            </>
           )}
         </>
       )}

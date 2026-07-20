@@ -14,6 +14,7 @@ import { cn, formatBRL } from '../../lib/utils'
 import { parseFile } from './parseFile'
 import { buildCategorySuggester } from './categorize'
 import { isLikelyDuplicate } from './duplicates'
+import { expandFutureInstallments } from './expandInstallments'
 import { importTransactions } from './api'
 import type { ImportTarget, ParsedEntry } from './types'
 
@@ -110,7 +111,14 @@ export function ImportPage() {
     setImportError(null)
     try {
       const target: ImportTarget = cardId ? { cardId } : { accountId: accountId! }
-      await importTransactions(workspaceId, selectedRows, target, user.uid)
+      // Cada linha selecionada com parcela detectada traz junto as parcelas
+      // futuras ainda não vistas em nenhuma fatura (já deduplicadas contra o
+      // que já existe) — ver expandInstallments.ts.
+      const withFutureInstallments = selectedRows.flatMap((row) => [
+        row,
+        ...expandFutureInstallments(row, scopedTransactions),
+      ])
+      await importTransactions(workspaceId, withFutureInstallments, target, user.uid)
       navigate(cardId ? `/cartoes/${cardId}/fatura` : `/contas/${accountId}`)
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Não foi possível importar. Tente novamente.')
@@ -176,7 +184,11 @@ export function ImportPage() {
           ) : null}
 
           <div className="flex flex-col gap-2">
-            {rows.map((row, index) => (
+            {rows.map((row, index) => {
+              const futureCount = row.installmentTotal
+                ? expandFutureInstallments(row, scopedTransactions).length
+                : 0
+              return (
               <div
                 key={index}
                 className="flex flex-col gap-2 rounded-2xl border border-border-light bg-surface-light p-3 dark:border-border-dark dark:bg-surface-dark-elevated"
@@ -207,6 +219,11 @@ export function ImportPage() {
                         ''
                       )}
                     </p>
+                    {futureCount > 0 ? (
+                      <p className="text-xs text-light-secondary dark:text-dark-secondary">
+                        + {futureCount} parcela(s) futura(s) será(ão) criada(s) automaticamente
+                      </p>
+                    ) : null}
                   </div>
                   <p
                     className={cn(
@@ -237,7 +254,8 @@ export function ImportPage() {
                     ))}
                 </select>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="flex flex-col gap-3 rounded-2xl border border-border-light bg-surface-light p-4 dark:border-border-dark dark:bg-surface-dark-elevated">
