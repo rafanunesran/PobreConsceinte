@@ -1,16 +1,15 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import { Plus, Receipt } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useTransactions } from './useTransactions'
 import { useAccounts } from '../accounts/useAccounts'
 import { useCards } from '../cards/useCards'
 import { useCategories } from '../categories/useCategories'
-import { CATEGORY_ICON_COMPONENTS } from '../categories/types'
-import { Card } from '../../components/ui/Card'
+import { TransactionsGrid } from './TransactionsGrid'
+import { MonthSelector } from '../../components/ui/MonthSelector'
+import { currentYearMonth } from './dateUtils'
 import { Button } from '../../components/ui/Button'
-import { cn, formatBRL } from '../../lib/utils'
 
 export function RegistrosPage() {
   const user = useAuthStore((state) => state.user)
@@ -18,6 +17,7 @@ export function RegistrosPage() {
   const { accounts } = useAccounts(user?.uid ?? '')
   const { cards } = useCards(user?.uid ?? '')
   const { categories } = useCategories(user?.uid ?? '')
+  const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
   if (!user) return null
 
@@ -66,50 +66,16 @@ export function RegistrosPage() {
           </Link>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {transactions.map((transaction) => {
-            const category = categoriesById.get(transaction.categoryId)
-            const Icon = category ? CATEGORY_ICON_COMPONENTS[category.icon] : Receipt
-            const linkedName =
-              transaction.accountId !== undefined
-                ? accountsById.get(transaction.accountId)?.name
-                : transaction.cardId !== undefined
-                  ? cardsById.get(transaction.cardId)?.name
-                  : undefined
-            const kind = transaction.type === 'expense' ? 'despesa' : 'receita'
-
-            return (
-              <Link key={transaction.id} to={`/registros/${kind}/${transaction.id}/editar`}>
-                <Card className="flex items-center gap-3">
-                  <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
-                    style={{ backgroundColor: category?.color ?? '#6B7280' }}
-                  >
-                    <Icon size={18} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-light-primary dark:text-dark-primary">
-                      {transaction.description}
-                    </p>
-                    <p className="text-sm text-light-secondary dark:text-dark-secondary">
-                      {format(new Date(`${transaction.date}T00:00:00`), "d 'de' MMM", { locale: ptBR })}
-                      {linkedName ? ` · ${linkedName}` : ''}
-                    </p>
-                  </div>
-                  <p
-                    className={cn(
-                      'shrink-0 font-semibold',
-                      transaction.type === 'expense' ? 'text-danger' : 'text-brand-500',
-                    )}
-                  >
-                    {transaction.type === 'expense' ? '-' : '+'}
-                    {formatBRL(transaction.amount)}
-                  </p>
-                </Card>
-              </Link>
-            )
-          })}
-        </div>
+        <>
+          <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+          <TransactionsGrid
+            transactions={transactions}
+            categoriesById={categoriesById}
+            accountsById={accountsById}
+            cardsById={cardsById}
+            selectedMonth={selectedMonth}
+          />
+        </>
       )}
     </div>
   )
