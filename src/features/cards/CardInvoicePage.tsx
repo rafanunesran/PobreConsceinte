@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ArrowLeft, ChevronLeft, ChevronRight, ListChecks, Receipt, Settings, X } from 'lucide-react'
@@ -30,13 +30,17 @@ function formatDisplayDate(date: string): string {
 export function CardInvoicePage() {
   const navigate = useNavigate()
   const { cardId } = useParams<{ cardId: string }>()
+  const [searchParams] = useSearchParams()
   const user = useAuthStore((state) => state.user)
   const workspaceId = useWorkspaceStore((state) => state.workspaceId)
   const family = useWorkspaceStore((state) => state.family)
   const { cards, loading: loadingCards } = useCards(workspaceId ?? '')
   const { transactions, loading: loadingTransactions } = useTransactions(workspaceId ?? '')
   const { categories } = useCategories(workspaceId ?? '')
-  const [periodOffset, setPeriodOffset] = useState(0)
+  // Lê o offset inicial da URL (ex: link vindo do extrato agregado por
+  // fatura) — depois disso o estado local assume, os chevrons continuam
+  // navegando normalmente a partir daqui.
+  const [periodOffset, setPeriodOffset] = useState(() => Number(searchParams.get('offset')) || 0)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())

@@ -1,4 +1,4 @@
-import { addMonthsClamped, formatDate, parseDate, roundToCents } from '../transactions/dateUtils'
+import { addMonthsClamped, formatDate, monthsBetween, parseDate, roundToCents } from '../transactions/dateUtils'
 import type { Transaction } from '../transactions/types'
 import type { CreditCard } from './types'
 
@@ -82,6 +82,77 @@ export function sumUnpaid(transactions: Transaction[]): number {
 // um retrato ao vivo do quanto do limite está comprometido.
 export function cardOccupiedLimit(transactions: Transaction[], cardId: string): number {
   return sumUnpaid(transactions.filter((t) => t.cardId === cardId))
+}
+
+// Diferente de sumUnpaid: soma TODAS as transações do período, pagas ou
+// não — representa o valor total histórico daquela fatura, não "quanto
+// ainda falta pagar". Uma fatura já paga (tudo com paid:true) precisa
+// continuar mostrando o total que ela teve, não R$ 0,00.
+function sumInvoiceTotal(transactions: Transaction[]): number {
+  return roundToCents(
+    transactions.reduce((sum, t) => (t.type === 'expense' ? sum + t.amount : sum - t.amount), 0),
+  )
+}
+
+export interface CardInvoiceGroup {
+  cardId: string
+  cardName: string
+  period: InvoicePeriod
+  dueDate: string
+  dueMonth: string // 'YYYY-MM' — mês de vencimento, usado pra agrupar no extrato
+  periodOffset: number // relativo à fatura aberta de hoje (0), pra linkar direto pra CardInvoicePage
+  amount: number
+}
+
+// Agrupa transações de cartão por fatura (cartão + período de fechamento)
+// — usado no extrato geral (Registros) pra mostrar "Fatura {cartão}" como
+// um único registro em vez de uma linha por compra. Cada fatura é alocada
+// pelo mês do VENCIMENTO, não da compra: uma compra feita depois do
+// fechamento só vira parte da fatura seguinte, que vence no mês seguinte.
+export function groupCardTransactionsByInvoice(
+  transactions: Transaction[],
+  cards: CreditCard[],
+): CardInvoiceGroup[] {
+  const cardsById = new Map(cards.map((c) => [c.id, c]))
+  const groups = new Map<
+    string,
+    { cardId: string; cardName: string; period: InvoicePeriod; dueDate: string; items: Transaction[] }
+  >()
+
+  for (const t of transactions) {
+    if (t.cardId === undefined) continue
+    const card = cardsById.get(t.cardId)
+    if (!card) continue
+    const period = getInvoicePeriod(card.closingDay, t.date)
+    const key = `${card.id}|${period.end}`
+    const existing = groups.get(key)
+    if (existing) {
+      existing.items.push(t)
+    } else {
+      groups.set(key, {
+        cardId: card.id,
+        cardName: card.name,
+        period,
+        dueDate: getDueDate(period.end, card.dueDay),
+        items: [t],
+      })
+    }
+  }
+
+  const today = todayDateString()
+  return Array.from(groups.values()).map((g) => {
+    const card = cardsById.get(g.cardId)
+    const openPeriod = card ? getInvoicePeriod(card.closingDay, today) : g.period
+    return {
+      cardId: g.cardId,
+      cardName: g.cardName,
+      period: g.period,
+      dueDate: g.dueDate,
+      dueMonth: g.dueDate.slice(0, 7),
+      periodOffset: monthsBetween(openPeriod.end, g.period.end),
+      amount: sumInvoiceTotal(g.items),
+    }
+  })
 }
 
 // steps positivo = avança N faturas (projeção), negativo = volta N faturas.
