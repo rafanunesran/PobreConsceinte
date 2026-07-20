@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { onSnapshot, query, where } from 'firebase/firestore'
 import { caixinhaMovementsCollection } from './movements'
 import type { CaixinhaMovement } from './types'
 
@@ -17,15 +17,15 @@ export function useCaixinhaMovements(uid: string, caixinhaId: string): UseCaixin
   useEffect(() => {
     setLoading(true)
     setError(false)
-    const q = query(
-      caixinhaMovementsCollection(uid),
-      where('caixinhaId', '==', caixinhaId),
-      orderBy('date', 'desc'),
-    )
+    // NOTE: sem orderBy aqui de propósito — mesma razão de useCaixinhas.ts,
+    // ordena no cliente pra não precisar de índice composto manual.
+    const q = query(caixinhaMovementsCollection(uid), where('caixinhaId', '==', caixinhaId))
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        setMovements(snapshot.docs.map((doc) => doc.data()))
+        const docs = snapshot.docs.map((doc) => doc.data())
+        docs.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+        setMovements(docs)
         setLoading(false)
       },
       () => {

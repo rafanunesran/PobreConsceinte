@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { onSnapshot, query, where } from 'firebase/firestore'
 import { caixinhasCollection } from './api'
 import type { Caixinha } from './types'
 
@@ -17,11 +17,16 @@ export function useCaixinhas(uid: string, accountId: string): UseCaixinhasResult
   useEffect(() => {
     setLoading(true)
     setError(false)
-    const q = query(caixinhasCollection(uid), where('accountId', '==', accountId), orderBy('name'))
+    // NOTE: sem orderBy aqui de propósito — where(campo A) + orderBy(campo
+    // B diferente) exige um índice composto manual no Firestore. Ordena no
+    // cliente em vez disso, evitando esse passo extra de configuração.
+    const q = query(caixinhasCollection(uid), where('accountId', '==', accountId))
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        setCaixinhas(snapshot.docs.map((doc) => doc.data()))
+        const docs = snapshot.docs.map((doc) => doc.data())
+        docs.sort((a, b) => a.name.localeCompare(b.name))
+        setCaixinhas(docs)
         setLoading(false)
       },
       () => {
