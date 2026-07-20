@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -8,6 +8,9 @@ import { useCaixinhas } from './useCaixinhas'
 import { useCaixinhaMovements } from './useCaixinhaMovements'
 import { CAIXINHA_MOVEMENT_LABELS, type CaixinhaMovementType } from './types'
 import { Card } from '../../components/ui/Card'
+import { Button } from '../../components/ui/Button'
+import { MonthSelector } from '../../components/ui/MonthSelector'
+import { currentYearMonth } from '../transactions/dateUtils'
 import { cn, formatBRL } from '../../lib/utils'
 
 const MOVEMENT_ICONS: Record<CaixinhaMovementType, typeof ArrowDownCircle> = {
@@ -26,6 +29,7 @@ export function CaixinhaDetailPage() {
   const { accountId, caixinhaId } = useParams<{ accountId: string; caixinhaId: string }>()
   const user = useAuthStore((state) => state.user)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
   const { caixinhas, loading: loadingCaixinhas } = useCaixinhas(user?.uid ?? '', accountId ?? '')
   const {
@@ -36,6 +40,11 @@ export function CaixinhaDetailPage() {
 
   const caixinha = caixinhas.find((c) => c.id === caixinhaId)
   const base = `/contas/${accountId}/caixinhas/${caixinhaId}`
+
+  const monthMovements = useMemo(
+    () => movements.filter((m) => m.date.startsWith(selectedMonth)),
+    [movements, selectedMonth],
+  )
 
   if (!user || !accountId || !caixinhaId) return null
 
@@ -124,51 +133,77 @@ export function CaixinhaDetailPage() {
 
       {loadingCaixinhas || !caixinha ? (
         <div className="h-40 animate-pulse rounded-2xl border border-border-light bg-surface-light dark:border-border-dark dark:bg-surface-dark-elevated" />
-      ) : movementsError ? (
-        <p className="text-sm text-danger">
-          Não foi possível carregar as movimentações. Verifique se as regras do Firestore foram
-          publicadas.
-        </p>
-      ) : loadingMovements ? (
-        <div className="h-40 animate-pulse rounded-2xl border border-border-light bg-surface-light dark:border-border-dark dark:bg-surface-dark-elevated" />
-      ) : movements.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border-light py-16 text-center dark:border-border-dark">
-          <PiggyBank size={32} className="text-light-secondary dark:text-dark-secondary" />
-          <p className="text-sm text-light-secondary dark:text-dark-secondary">
-            Nenhuma movimentação ainda.
-          </p>
-        </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {movements.map((movement) => {
-            const Icon = MOVEMENT_ICONS[movement.type]
-            const positive = movement.amount >= 0
-            return (
-              <Card key={movement.id} className="flex items-center gap-3 p-3">
-                <span
-                  className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                    positive ? 'bg-brand-500/10 text-brand-500' : 'bg-danger/10 text-danger',
-                  )}
-                >
-                  <Icon size={14} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-light-primary dark:text-dark-primary">
-                    {CAIXINHA_MOVEMENT_LABELS[movement.type]}
-                  </p>
-                  <p className="text-xs text-light-secondary dark:text-dark-secondary">
-                    {formatDisplayDate(movement.date)}
-                  </p>
-                </div>
-                <p className={cn('shrink-0 text-sm font-semibold', positive ? 'text-brand-500' : 'text-danger')}>
-                  {positive ? '+' : '-'}
-                  {formatBRL(Math.abs(movement.amount))}
-                </p>
-              </Card>
-            )
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Link to={`${base}/transferir?direction=guardar`}>
+              <Button type="button" className="w-full gap-2">
+                <ArrowDownCircle size={18} />
+                Guardar
+              </Button>
+            </Link>
+            <Link to={`${base}/transferir?direction=resgatar`}>
+              <Button type="button" variant="secondary" className="w-full gap-2">
+                <ArrowUpCircle size={18} />
+                Resgatar
+              </Button>
+            </Link>
+          </div>
+
+          <MonthSelector value={selectedMonth} onChange={setSelectedMonth} />
+
+          {movementsError ? (
+            <p className="text-sm text-danger">
+              Não foi possível carregar as movimentações. Verifique se as regras do Firestore
+              foram publicadas.
+            </p>
+          ) : loadingMovements ? (
+            <div className="h-40 animate-pulse rounded-2xl border border-border-light bg-surface-light dark:border-border-dark dark:bg-surface-dark-elevated" />
+          ) : monthMovements.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border-light py-16 text-center dark:border-border-dark">
+              <PiggyBank size={32} className="text-light-secondary dark:text-dark-secondary" />
+              <p className="text-sm text-light-secondary dark:text-dark-secondary">
+                Nenhuma movimentação neste mês.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {monthMovements.map((movement) => {
+                const Icon = MOVEMENT_ICONS[movement.type]
+                const positive = movement.amount >= 0
+                return (
+                  <Card key={movement.id} className="flex items-center gap-3 p-3">
+                    <span
+                      className={cn(
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                        positive ? 'bg-brand-500/10 text-brand-500' : 'bg-danger/10 text-danger',
+                      )}
+                    >
+                      <Icon size={14} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-light-primary dark:text-dark-primary">
+                        {CAIXINHA_MOVEMENT_LABELS[movement.type]}
+                      </p>
+                      <p className="text-xs text-light-secondary dark:text-dark-secondary">
+                        {formatDisplayDate(movement.date)}
+                      </p>
+                    </div>
+                    <p
+                      className={cn(
+                        'shrink-0 text-sm font-semibold',
+                        positive ? 'text-brand-500' : 'text-danger',
+                      )}
+                    >
+                      {positive ? '+' : '-'}
+                      {formatBRL(Math.abs(movement.amount))}
+                    </p>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
