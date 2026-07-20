@@ -69,6 +69,13 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'cartoes/:cardId/importar',
+          lazy: async () => {
+            const { ImportPage } = await import('./features/imports/ImportPage')
+            return { Component: ImportPage }
+          },
+        },
+        {
           path: 'contas',
           lazy: async () => {
             const { AccountsPage } = await import('./features/accounts/AccountsPage')
@@ -108,6 +115,13 @@ export const router = createBrowserRouter(
           lazy: async () => {
             const { AdjustAccountBalancePage } = await import('./features/accounts/AdjustAccountBalancePage')
             return { Component: AdjustAccountBalancePage }
+          },
+        },
+        {
+          path: 'contas/:accountId/importar',
+          lazy: async () => {
+            const { ImportPage } = await import('./features/imports/ImportPage')
+            return { Component: ImportPage }
           },
         },
         {

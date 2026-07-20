@@ -114,6 +114,13 @@ export function CardInvoicePage() {
                   >
                     Ajuste de fatura
                   </Link>
+                  <Link
+                    to={`/cartoes/${card.id}/importar`}
+                    onClick={() => setMenuOpen(false)}
+                    className="px-4 py-2.5 text-left text-sm text-light-primary transition-colors duration-200 hover:bg-border-light dark:text-dark-primary dark:hover:bg-border-dark"
+                  >
+                    Importar fatura
+                  </Link>
                 </div>
               </>
             ) : null}
