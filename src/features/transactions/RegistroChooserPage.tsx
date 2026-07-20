@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowDownCircle, ArrowUpCircle, ClipboardCheck } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useTransactions } from './useTransactions'
+import { PendingTransactionsGrid } from './PendingTransactionsGrid'
 import { MonthSelector } from '../../components/ui/MonthSelector'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -109,6 +110,12 @@ export function RegistroChooserPage() {
           </p>
         </div>
       </Card>
+
+      <PendingTransactionsGrid
+        uid={user?.uid ?? ''}
+        transactions={transactions}
+        selectedMonth={selectedMonth}
+      />
 
       <Link to="/registros/pendentes">
         <Button type="button" variant="secondary" className="w-full gap-2">
