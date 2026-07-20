@@ -26,12 +26,18 @@ function monthLabel(periodEnd: string): string {
 export function InvoicesSummaryCard({ offset, onOffsetChange, month }: InvoicesSummaryCardProps) {
   const headerPeriodEnd = month.entries[0]?.periodEnd
   const label = headerPeriodEnd ? monthLabel(headerPeriodEnd) : null
+  const total = month.entries.reduce((sum, entry) => sum + entry.amount, 0)
 
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-light-primary dark:text-dark-primary">Faturas</p>
+          <Link
+            to="/cartoes"
+            className="text-sm font-medium text-light-primary transition-colors duration-200 hover:text-brand-500 dark:text-dark-primary"
+          >
+            Faturas
+          </Link>
           {label ? (
             <p className="text-sm text-light-secondary dark:text-dark-secondary">
               {label}
@@ -68,41 +74,49 @@ export function InvoicesSummaryCard({ offset, onOffsetChange, month }: InvoicesS
           Nenhum cartão cadastrado ainda.
         </p>
       ) : (
-        <div className="flex flex-col gap-1.5">
-          {month.entries.map((entry) => (
-            <div
-              key={entry.cardId}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border-light px-3 py-2 dark:border-border-dark"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-light-primary dark:text-dark-primary">
-                  {entry.cardName}
-                  {headerPeriodEnd && entry.periodEnd.slice(0, 7) !== headerPeriodEnd.slice(0, 7) ? (
-                    <span className="text-xs text-light-secondary dark:text-dark-secondary">
-                      {' '}
-                      ({monthLabel(entry.periodEnd)})
-                    </span>
-                  ) : null}
-                </p>
-                <p
-                  className={cn(
-                    'text-sm font-semibold',
-                    entry.amount > 0 ? 'text-danger' : 'text-light-secondary dark:text-dark-secondary',
-                  )}
-                >
-                  {formatBRL(entry.amount)}
-                </p>
-              </div>
-              {offset <= 0 && entry.amount > 0 ? (
-                <Link to={`/cartoes/${entry.cardId}/fatura/pagar?offset=${offset}`}>
-                  <Button type="button" variant="secondary" className="shrink-0 px-3 py-1.5 text-xs">
-                    Pagar
-                  </Button>
+        <>
+          <div className="flex flex-col gap-1.5">
+            {month.entries.map((entry) => (
+              <div
+                key={entry.cardId}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border-light px-3 py-2 dark:border-border-dark"
+              >
+                <Link to={`/cartoes/${entry.cardId}/fatura?offset=${offset}`} className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-light-primary dark:text-dark-primary">
+                    {entry.cardName}
+                    {headerPeriodEnd && entry.periodEnd.slice(0, 7) !== headerPeriodEnd.slice(0, 7) ? (
+                      <span className="text-xs text-light-secondary dark:text-dark-secondary">
+                        {' '}
+                        ({monthLabel(entry.periodEnd)})
+                      </span>
+                    ) : null}
+                  </p>
+                  <p
+                    className={cn(
+                      'text-sm font-semibold',
+                      entry.amount > 0 ? 'text-danger' : 'text-light-secondary dark:text-dark-secondary',
+                    )}
+                  >
+                    {formatBRL(entry.amount)}
+                  </p>
                 </Link>
-              ) : null}
-            </div>
-          ))}
-        </div>
+                {offset <= 0 && entry.amount > 0 ? (
+                  <Link to={`/cartoes/${entry.cardId}/fatura/pagar?offset=${offset}`}>
+                    <Button type="button" variant="secondary" className="shrink-0 px-3 py-1.5 text-xs">
+                      Pagar
+                    </Button>
+                  </Link>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between border-t border-border-light pt-3 dark:border-border-dark">
+            <p className="text-sm text-light-secondary dark:text-dark-secondary">Total da visualização</p>
+            <p className={cn('text-base font-semibold', total >= 0 ? 'text-danger' : 'text-brand-500')}>
+              {formatBRL(total)}
+            </p>
+          </div>
+        </>
       )}
     </Card>
   )

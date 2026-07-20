@@ -3,6 +3,7 @@ import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 import { TransactionCompactCard } from './TransactionCompactCard'
 import { CardInvoiceRowCard } from '../cards/CardInvoiceRowCard'
 import { groupCardTransactionsByInvoice, type CardInvoiceGroup } from '../cards/invoiceUtils'
+import { formatBRL } from '../../lib/utils'
 import type { Transaction } from './types'
 import type { Category } from '../categories/types'
 import type { Account } from '../accounts/types'
@@ -80,7 +81,7 @@ export function TransactionsGrid({
 }: TransactionsGridProps) {
   const cards = useMemo(() => Array.from(cardsById.values()), [cardsById])
 
-  const { expenses, incomes, expenseGroups, incomeGroups } = useMemo(() => {
+  const { expenses, incomes, expenseGroups, incomeGroups, totalExpenses, totalIncomes } = useMemo(() => {
     // Cartão é representado pela fatura agregada (ver abaixo), nunca linha a
     // linha — só transações de conta entram na listagem individual, e essas
     // sim usam a data da própria movimentação pro filtro de mês.
@@ -97,36 +98,55 @@ export function TransactionsGrid({
     const allGroups = groupCardTransactionsByInvoice(transactions, cards)
     const groupsOfMonth = allGroups.filter((g) => g.dueMonth === selectedMonth && g.unpaidAmount !== 0)
 
-    return {
-      expenses: ofMonth.filter((t) => t.type === 'expense'),
-      incomes: ofMonth.filter((t) => t.type === 'income'),
-      expenseGroups: groupsOfMonth.filter((g) => g.unpaidAmount > 0),
-      incomeGroups: groupsOfMonth.filter((g) => g.unpaidAmount < 0),
-    }
+    const expenses = ofMonth.filter((t) => t.type === 'expense')
+    const incomes = ofMonth.filter((t) => t.type === 'income')
+    const expenseGroups = groupsOfMonth.filter((g) => g.unpaidAmount > 0)
+    const incomeGroups = groupsOfMonth.filter((g) => g.unpaidAmount < 0)
+
+    const totalExpenses =
+      expenses.reduce((sum, t) => sum + t.amount, 0) + expenseGroups.reduce((sum, g) => sum + g.unpaidAmount, 0)
+    const totalIncomes =
+      incomes.reduce((sum, t) => sum + t.amount, 0) +
+      incomeGroups.reduce((sum, g) => sum + Math.abs(g.unpaidAmount), 0)
+
+    return { expenses, incomes, expenseGroups, incomeGroups, totalExpenses, totalIncomes }
   }, [transactions, selectedMonth, cards])
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <TransactionColumn
-        title="Despesas"
-        icon={ArrowDownCircle}
-        colorClass="text-danger"
-        emptyLabel="Nenhuma despesa neste mês"
-        items={expenses}
-        cardGroups={expenseGroups}
-        categoriesById={categoriesById}
-        accountsById={accountsById}
-      />
-      <TransactionColumn
-        title="Receitas"
-        icon={ArrowUpCircle}
-        colorClass="text-brand-500"
-        emptyLabel="Nenhuma receita neste mês"
-        items={incomes}
-        cardGroups={incomeGroups}
-        categoriesById={categoriesById}
-        accountsById={accountsById}
-      />
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border-light bg-surface-light p-4 dark:border-border-dark dark:bg-surface-dark-elevated">
+        <div className="min-w-0">
+          <p className="text-xs text-light-secondary dark:text-dark-secondary">Despesas</p>
+          <p className="truncate text-lg font-semibold text-danger">{formatBRL(totalExpenses)}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-light-secondary dark:text-dark-secondary">Receitas</p>
+          <p className="truncate text-lg font-semibold text-brand-500">{formatBRL(totalIncomes)}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <TransactionColumn
+          title="Despesas"
+          icon={ArrowDownCircle}
+          colorClass="text-danger"
+          emptyLabel="Nenhuma despesa neste mês"
+          items={expenses}
+          cardGroups={expenseGroups}
+          categoriesById={categoriesById}
+          accountsById={accountsById}
+        />
+        <TransactionColumn
+          title="Receitas"
+          icon={ArrowUpCircle}
+          colorClass="text-brand-500"
+          emptyLabel="Nenhuma receita neste mês"
+          items={incomes}
+          cardGroups={incomeGroups}
+          categoriesById={categoriesById}
+          accountsById={accountsById}
+        />
+      </div>
     </div>
   )
 }
