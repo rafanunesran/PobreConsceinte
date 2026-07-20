@@ -5,10 +5,9 @@ import { useConfirmPending } from './useConfirmPending'
 import { PendingTransactionCompactCard } from './PendingTransactionCompactCard'
 import { Button } from '../../components/ui/Button'
 import { cn, formatBRL } from '../../lib/utils'
-import { currentYearMonth } from './dateUtils'
 import { useCards } from '../cards/useCards'
 import { CardInvoicePendingCard } from '../cards/CardInvoicePendingCard'
-import { computeInvoiceRows, getInvoicePeriod, todayDateString, type CardInvoiceRow } from '../cards/invoiceUtils'
+import { groupCardTransactionsByInvoice, type CardInvoiceGroup } from '../cards/invoiceUtils'
 import type { Transaction } from './types'
 
 interface PendingTransactionsGridProps {
@@ -26,7 +25,7 @@ interface PendingColumnProps {
   categoriesById: Map<string, ReturnType<typeof useCategories>['categories'][number]>
   confirmingIds: Set<string>
   onConfirm: (transaction: Transaction) => void
-  extraRows?: CardInvoiceRow[]
+  extraRows?: CardInvoiceGroup[]
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onConfirmSelected: () => void
@@ -56,7 +55,7 @@ function PendingColumn({
     .reduce((sum, t) => sum + t.amount, 0)
   const selectedExtraTotal = (extraRows ?? [])
     .filter((row) => selectedExtraIds?.has(row.cardId))
-    .reduce((sum, row) => sum + row.periodOwed, 0)
+    .reduce((sum, row) => sum + row.unpaidAmount, 0)
   const selectedTotal = selectedItemsTotal + selectedExtraTotal
   const hasAnySelection = selectedIds.size > 0 || (selectedExtraIds?.size ?? 0) > 0
   const isConfirmingSelected = [...selectedIds].some((id) => confirmingIds.has(id))
@@ -98,10 +97,11 @@ function PendingColumn({
           {hasExtraRows
             ? extraRows.map((row) => (
                 <CardInvoicePendingCard
-                  key={row.cardId}
+                  key={`${row.cardId}-${row.period.end}`}
                   cardId={row.cardId}
                   cardName={row.cardName}
-                  amount={row.periodOwed}
+                  amount={row.unpaidAmount}
+                  periodOffset={row.periodOffset}
                   selected={selectedExtraIds?.has(row.cardId) ?? false}
                   onToggleSelect={() => onToggleExtraSelect?.(row.cardId)}
                 />
@@ -141,37 +141,28 @@ export function PendingTransactionsGrid({ uid, transactions, selectedMonth }: Pe
 
   const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
 
-  // Transações do período ABERTO de cada cartão — essas ficam de fora da
-  // lista individual porque são representadas por um card agregado
-  // ("Fatura {nome}"), não uma linha por compra.
-  const openPeriodTransactionIds = useMemo(() => {
-    const today = todayDateString()
-    const ids = new Set<string>()
-    for (const card of cards) {
-      const period = getInvoicePeriod(card.closingDay, today)
-      for (const t of transactions) {
-        if (t.cardId === card.id && t.date >= period.start && t.date <= period.end) ids.add(t.id)
-      }
-    }
-    return ids
-  }, [cards, transactions])
-
+  // Cartão nunca entra na lista individual — sempre representado pelo card
+  // agregado "Fatura {nome}" (ver groupCardTransactionsByInvoice), alocado
+  // pelo mês de VENCIMENTO da fatura, não pela data da compra. Isso vale
+  // pra qualquer mês navegado, não só o vigente: uma fatura futura ou já
+  // vencida aparece igual, no mês em que vence.
   const { expenses, incomes } = useMemo(() => {
     const pendingOfMonth = transactions.filter(
-      (t) => !t.paid && t.date.startsWith(selectedMonth) && !openPeriodTransactionIds.has(t.id),
+      (t) => !t.paid && t.accountId !== undefined && t.date.startsWith(selectedMonth),
     )
     return {
       expenses: pendingOfMonth.filter((t) => t.type === 'expense'),
       incomes: pendingOfMonth.filter((t) => t.type === 'income'),
     }
-  }, [transactions, selectedMonth, openPeriodTransactionIds])
+  }, [transactions, selectedMonth])
 
-  // Só faz sentido mostrar a fatura do "mês vigente" quando o usuário está
-  // vendo o mês vigente de verdade — navegando pra outro mês do balancete,
-  // o conceito de fatura aberta não se aplica àquele mês.
+  // Só o que ainda está em aberto (>0) — um saldo credor de cartão sem
+  // nenhuma cobrança pendente pra abater não é "a pagar" de verdade, e não
+  // dá pra "Pagar" uma fatura sem valor devido (payCardInvoice exige
+  // owed > 0), então nem faz sentido esse card aparecer aqui.
   const cardInvoiceRows = useMemo(() => {
-    if (selectedMonth !== currentYearMonth()) return []
-    return computeInvoiceRows(cards, transactions, 0).rows.filter((row) => row.periodOwed > 0)
+    const allGroups = groupCardTransactionsByInvoice(transactions, cards)
+    return allGroups.filter((g) => g.dueMonth === selectedMonth && g.unpaidAmount > 0)
   }, [cards, transactions, selectedMonth])
 
   async function handleConfirmSelectedExpenses() {

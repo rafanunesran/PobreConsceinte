@@ -1,49 +1,46 @@
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-import { formatBRL } from '../../lib/utils'
-import type { CardInvoiceRow } from './invoiceUtils'
+import { cn, formatBRL } from '../../lib/utils'
+import type { CardInvoiceWindow } from './invoiceUtils'
 
 interface InvoicesSummaryCardProps {
-  periodOffset: number
-  onPeriodOffsetChange: (offset: number) => void
-  rows: CardInvoiceRow[]
-  total: number
+  baseOffset: number
+  onBaseOffsetChange: (offset: number) => void
+  windows: CardInvoiceWindow[]
 }
 
-function offsetLabel(offset: number): string {
-  if (offset === 0) return 'Fatura atual'
-  if (offset < 0) return `${-offset} fatura${offset < -1 ? 's' : ''} atrás`
-  return `Em ${offset} fatura${offset > 1 ? 's' : ''}`
+function monthLabel(periodEnd: string): string {
+  const label = format(new Date(`${periodEnd}T00:00:00`), 'MMMM', { locale: ptBR })
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-export function InvoicesSummaryCard({
-  periodOffset,
-  onPeriodOffsetChange,
-  rows,
-  total,
-}: InvoicesSummaryCardProps) {
+// Janela fixa por cartão: a fatura que fechou mais recentemente, a aberta
+// (que ainda vai fechar) e as próximas projetadas — ver computeInvoiceWindows
+// em invoiceUtils.ts. As setas deslocam a janela inteira pra frente/trás,
+// tipo uma faixa móvel; "Fechada"/"Aberta" continuam corretas mesmo assim
+// porque o status vem calculado relativo a hoje, não à posição da janela.
+export function InvoicesSummaryCard({ baseOffset, onBaseOffsetChange, windows }: InvoicesSummaryCardProps) {
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-light-primary dark:text-dark-primary">Faturas</p>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="Fatura anterior"
-            onClick={() => onPeriodOffsetChange(periodOffset - 1)}
+            aria-label="Faturas anteriores"
+            onClick={() => onBaseOffsetChange(baseOffset - 1)}
             className="flex h-7 w-7 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
           >
             <ChevronLeft size={14} />
           </button>
-          <span className="min-w-[7rem] text-center text-xs text-light-secondary dark:text-dark-secondary">
-            {offsetLabel(periodOffset)}
-          </span>
           <button
             type="button"
-            aria-label="Próxima fatura"
-            onClick={() => onPeriodOffsetChange(periodOffset + 1)}
+            aria-label="Próximas faturas"
+            onClick={() => onBaseOffsetChange(baseOffset + 1)}
             className="flex h-7 w-7 items-center justify-center rounded-full border border-border-light text-light-secondary transition-colors duration-200 hover:text-light-primary dark:border-border-dark dark:text-dark-secondary dark:hover:text-dark-primary"
           >
             <ChevronRight size={14} />
@@ -51,48 +48,55 @@ export function InvoicesSummaryCard({
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {windows.length === 0 ? (
         <p className="text-sm text-light-secondary dark:text-dark-secondary">
           Nenhum cartão cadastrado ainda.
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
-          {rows.map((row) => (
-            <div
-              key={row.cardId}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border-light px-3 py-2.5 dark:border-border-dark"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-light-primary dark:text-dark-primary">
-                  {row.cardName}
-                </p>
-                <p className="text-sm text-light-secondary dark:text-dark-secondary">
-                  {formatBRL(row.periodOwed)}
-                </p>
+        <div className="flex flex-col gap-4">
+          {windows.map((window) => (
+            <div key={window.cardId} className="flex flex-col gap-2">
+              <p className="truncate text-xs font-medium text-light-secondary dark:text-dark-secondary">
+                {window.cardName}
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {window.entries.map((entry) => (
+                  <div
+                    key={entry.offset}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border-light px-3 py-2 dark:border-border-dark"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-light-primary dark:text-dark-primary">
+                        {monthLabel(entry.periodEnd)}
+                        {entry.status === 'closed' ? (
+                          <span className="text-light-secondary dark:text-dark-secondary"> · Fechada</span>
+                        ) : entry.status === 'open' ? (
+                          <span className="text-brand-500"> · Aberta</span>
+                        ) : null}
+                      </p>
+                      <p
+                        className={cn(
+                          'text-sm font-semibold',
+                          entry.amount > 0 ? 'text-danger' : 'text-light-secondary dark:text-dark-secondary',
+                        )}
+                      >
+                        {formatBRL(entry.amount)}
+                      </p>
+                    </div>
+                    {entry.offset <= 0 && entry.amount > 0 ? (
+                      <Link to={`/cartoes/${window.cardId}/fatura/pagar?offset=${entry.offset}`}>
+                        <Button type="button" variant="secondary" className="shrink-0 px-3 py-1.5 text-xs">
+                          Pagar
+                        </Button>
+                      </Link>
+                    ) : null}
+                  </div>
+                ))}
               </div>
-              {periodOffset <= 0 && row.periodOwed > 0 ? (
-                <Link to={`/cartoes/${row.cardId}/fatura/pagar?offset=${periodOffset}`}>
-                  <Button type="button" variant="secondary" className="shrink-0 px-3 py-1.5 text-xs">
-                    Pagar
-                  </Button>
-                </Link>
-              ) : periodOffset <= 0 ? (
-                <span className="flex shrink-0 items-center gap-1 text-xs text-brand-500">
-                  <CheckCircle2 size={14} />
-                  Em dia
-                </span>
-              ) : null}
             </div>
           ))}
         </div>
       )}
-
-      <div className="border-t border-border-light pt-3 dark:border-border-dark">
-        <p className="text-sm text-light-secondary dark:text-dark-secondary">Total</p>
-        <p className="text-lg font-semibold text-light-primary dark:text-dark-primary">
-          {formatBRL(total)}
-        </p>
-      </div>
     </Card>
   )
 }

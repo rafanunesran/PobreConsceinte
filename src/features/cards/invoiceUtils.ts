@@ -101,7 +101,8 @@ export interface CardInvoiceGroup {
   dueDate: string
   dueMonth: string // 'YYYY-MM' — mês de vencimento, usado pra agrupar no extrato
   periodOffset: number // relativo à fatura aberta de hoje (0), pra linkar direto pra CardInvoicePage
-  amount: number
+  amount: number // total histórico do período (pago ou não) — ver sumInvoiceTotal
+  unpaidAmount: number // só o que ainda está em aberto — ver sumUnpaid
 }
 
 // Agrupa transações de cartão por fatura (cartão + período de fechamento)
@@ -151,8 +152,22 @@ export function groupCardTransactionsByInvoice(
       dueMonth: g.dueDate.slice(0, 7),
       periodOffset: monthsBetween(openPeriod.end, g.period.end),
       amount: sumInvoiceTotal(g.items),
+      unpaidAmount: sumUnpaid(g.items),
     }
   })
+}
+
+// Mês "efetivo" de uma transação pra agrupar por mês em qualquer tela: uma
+// transação de conta usa a própria data (é quando o dinheiro mexeu de
+// verdade); uma transação de cartão usa o mês de VENCIMENTO da fatura em
+// que ela caiu — pode ser diferente do mês da compra (compra feita depois
+// do fechamento só vence no mês seguinte).
+export function effectiveMonth(transaction: Transaction, cardsById: Map<string, CreditCard>): string {
+  if (transaction.cardId === undefined) return transaction.date.slice(0, 7)
+  const card = cardsById.get(transaction.cardId)
+  if (!card) return transaction.date.slice(0, 7)
+  const period = getInvoicePeriod(card.closingDay, transaction.date)
+  return getDueDate(period.end, card.dueDay).slice(0, 7)
 }
 
 // steps positivo = avança N faturas (projeção), negativo = volta N faturas.
@@ -166,29 +181,44 @@ export function shiftInvoicePeriod(closingDay: number, period: InvoicePeriod, st
   return result
 }
 
-export interface CardInvoiceRow {
-  cardId: string
-  cardName: string
-  periodOwed: number
+export interface CardInvoiceWindowEntry {
+  offset: number // relativo a HOJE (não à janela) — -1 sempre é a última fechada, 0 sempre é a aberta
+  periodEnd: string // 'YYYY-MM-DD' — pro caller formatar o nome do mês
+  status: 'closed' | 'open' | null
+  amount: number
 }
 
-// offset=0 é a fatura aberta de cada cartão (hoje) — usado tanto na página
-// de Cartões quanto na Home, que mostram a mesma lista agregada em lugares
-// diferentes; centralizado aqui pra não duplicar a lógica.
-export function computeInvoiceRows(
+export interface CardInvoiceWindow {
+  cardId: string
+  cardName: string
+  entries: CardInvoiceWindowEntry[]
+}
+
+// Janela fixa de 5 faturas por cartão: a que fechou mais recentemente
+// (offset -1), a aberta (offset 0) e as 3 seguintes projetadas — desloca
+// inteira com `baseOffset` (as setas do InvoicesSummaryCard mudam isso),
+// mas `status` continua sempre relativo a HOJE, não à janela, então
+// "fechada"/"aberta" nunca aparecem em lugar errado mesmo com a janela
+// deslocada.
+export function computeInvoiceWindows(
   cards: CreditCard[],
   transactions: Transaction[],
-  periodOffset: number,
-): { rows: CardInvoiceRow[]; total: number } {
+  baseOffset: number,
+): CardInvoiceWindow[] {
   const today = todayDateString()
-  const rows = cards.map((card) => {
+  const offsets = [-1, 0, 1, 2, 3].map((o) => o + baseOffset)
+
+  return cards.map((card) => {
     const openPeriod = getInvoicePeriod(card.closingDay, today)
-    const period = shiftInvoicePeriod(card.closingDay, openPeriod, periodOffset)
-    return {
-      cardId: card.id,
-      cardName: card.name,
-      periodOwed: sumUnpaid(transactionsInPeriod(transactions, card.id, period)),
-    }
+    const entries = offsets.map((offset) => {
+      const period = shiftInvoicePeriod(card.closingDay, openPeriod, offset)
+      return {
+        offset,
+        periodEnd: period.end,
+        status: offset === -1 ? ('closed' as const) : offset === 0 ? ('open' as const) : null,
+        amount: sumUnpaid(transactionsInPeriod(transactions, card.id, period)),
+      }
+    })
+    return { cardId: card.id, cardName: card.name, entries }
   })
-  return { rows, total: rows.reduce((sum, row) => sum + row.periodOwed, 0) }
 }

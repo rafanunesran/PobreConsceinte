@@ -1,26 +1,42 @@
 import { useMemo } from 'react'
 import { Card } from '../../components/ui/Card'
 import { cn, formatBRL } from '../../lib/utils'
+import { effectiveMonth } from '../cards/invoiceUtils'
+import type { CreditCard } from '../cards/types'
 import type { Transaction } from './types'
 
 interface BalanceteCardProps {
   transactions: Transaction[]
   selectedMonth: string // 'YYYY-MM'
+  cardsById: Map<string, CreditCard>
 }
 
-export function BalanceteCard({ transactions, selectedMonth }: BalanceteCardProps) {
+export function BalanceteCard({ transactions, selectedMonth, cardsById }: BalanceteCardProps) {
   const balancete = useMemo(() => {
-    const ofMonth = transactions.filter((t) => t.date.startsWith(selectedMonth))
-    const sum = (predicate: (t: (typeof ofMonth)[number]) => boolean) =>
-      ofMonth.filter(predicate).reduce((acc, t) => acc + t.amount, 0)
+    // Pago/recebido já são fatos consumados — usam a data real do
+    // movimento. A pagar/a receber ainda não aconteceram: pra cartão, só
+    // fazem sentido no mês de VENCIMENTO da fatura (pode ser diferente do
+    // mês da compra), não na data da compra em si.
+    const paidOfMonth = transactions.filter((t) => t.paid && t.date.startsWith(selectedMonth))
+    const unpaidOfMonth = transactions.filter(
+      (t) => !t.paid && effectiveMonth(t, cardsById) === selectedMonth,
+    )
 
-    const recebido = sum((t) => t.type === 'income' && t.paid)
-    const pago = sum((t) => t.type === 'expense' && t.paid)
-    const aReceber = sum((t) => t.type === 'income' && !t.paid)
-    const aPagar = sum((t) => t.type === 'expense' && !t.paid)
+    const recebido = paidOfMonth
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const pago = paidOfMonth
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const aReceber = unpaidOfMonth
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const aPagar = unpaidOfMonth
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
 
     return { recebido, pago, aReceber, aPagar, resultado: recebido - pago }
-  }, [transactions, selectedMonth])
+  }, [transactions, selectedMonth, cardsById])
 
   return (
     <Card className="flex flex-col gap-3">

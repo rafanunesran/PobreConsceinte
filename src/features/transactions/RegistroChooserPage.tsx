@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, ClipboardCheck } from 'lucide-react'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { useTransactions } from './useTransactions'
+import { useCards } from '../cards/useCards'
 import { PendingTransactionsGrid } from './PendingTransactionsGrid'
 import { BalanceteCard } from './BalanceteCard'
 import { currentYearMonth } from './dateUtils'
@@ -12,6 +13,8 @@ import { Button } from '../../components/ui/Button'
 export function RegistroChooserPage() {
   const workspaceId = useWorkspaceStore((state) => state.workspaceId)
   const { transactions } = useTransactions(workspaceId ?? '')
+  const { cards } = useCards(workspaceId ?? '')
+  const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards])
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth())
 
   return (
@@ -69,7 +72,7 @@ export function RegistroChooserPage() {
         </Link>
       </div>
 
-      <BalanceteCard transactions={transactions} selectedMonth={selectedMonth} />
+      <BalanceteCard transactions={transactions} selectedMonth={selectedMonth} cardsById={cardsById} />
 
       <PendingTransactionsGrid
         uid={workspaceId ?? ''}

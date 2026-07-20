@@ -8,7 +8,7 @@ import { useTransactions } from '../transactions/useTransactions'
 import { CardsTotalCard } from './CardsTotalCard'
 import { InvoicesSummaryCard } from './InvoicesSummaryCard'
 import { CardTile } from './CardTile'
-import { cardOccupiedLimit, computeInvoiceRows } from './invoiceUtils'
+import { cardOccupiedLimit, computeInvoiceWindows } from './invoiceUtils'
 import { Button } from '../../components/ui/Button'
 
 export function CardsPage() {
@@ -18,7 +18,7 @@ export function CardsPage() {
   // `user`/workspace ainda não resolveu, e só corta a renderização depois.
   const { cards, loading, error } = useCards(workspaceId ?? '')
   const { transactions } = useTransactions(workspaceId ?? '')
-  const [periodOffset, setPeriodOffset] = useState(0)
+  const [invoiceBaseOffset, setInvoiceBaseOffset] = useState(0)
 
   const occupiedByCard = useMemo(() => {
     const map = new Map<string, number>()
@@ -32,9 +32,9 @@ export function CardsPage() {
     return { totalLimit: limit, totalOccupied: occupied, totalAvailable: limit - occupied }
   }, [cards, occupiedByCard])
 
-  const { rows, total: invoicesTotal } = useMemo(
-    () => computeInvoiceRows(cards, transactions, periodOffset),
-    [cards, transactions, periodOffset],
+  const invoiceWindows = useMemo(
+    () => computeInvoiceWindows(cards, transactions, invoiceBaseOffset),
+    [cards, transactions, invoiceBaseOffset],
   )
 
   // Só renderiza atrás de <ProtectedRoute>, `user` nunca deveria ser null
@@ -93,10 +93,9 @@ export function CardsPage() {
 
           <div className="flex flex-col gap-6 lg:w-3/4">
             <InvoicesSummaryCard
-              periodOffset={periodOffset}
-              onPeriodOffsetChange={setPeriodOffset}
-              rows={rows}
-              total={invoicesTotal}
+              baseOffset={invoiceBaseOffset}
+              onBaseOffsetChange={setInvoiceBaseOffset}
+              windows={invoiceWindows}
             />
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

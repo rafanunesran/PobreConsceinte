@@ -8,20 +8,22 @@ interface CardInvoicePendingCardProps {
   cardId: string
   cardName: string
   amount: number
+  periodOffset: number
   selected: boolean
   onToggleSelect: () => void
 }
 
-// Representa a fatura ABERTA de um cartão como um item só em "Despesas
-// pendentes" — em vez de uma linha por compra do cartão. Pagar sempre abre
-// a fatura aberta (offset 0), que é exatamente o valor sendo somado aqui.
-// O checkbox só entra na soma exibida no cabeçalho da coluna — a fatura
-// continua sendo paga pelo fluxo dedicado (precisa escolher a conta de
-// origem), não pelo "Pagar (N)" genérico dos itens de conta.
+// Representa UMA fatura de cartão (não necessariamente a aberta — pode ser
+// uma já vencida ou uma futura, ver groupCardTransactionsByInvoice) como um
+// item só em "Despesas pendentes", em vez de uma linha por compra do
+// cartão. O checkbox só entra na soma exibida no cabeçalho da coluna — a
+// fatura continua sendo paga pelo fluxo dedicado (precisa escolher a conta
+// de origem), não pelo "Pagar (N)" genérico dos itens de conta.
 export function CardInvoicePendingCard({
   cardId,
   cardName,
   amount,
+  periodOffset,
   selected,
   onToggleSelect,
 }: CardInvoicePendingCardProps) {
@@ -43,7 +45,7 @@ export function CardInvoicePendingCard({
         </p>
       </div>
       <p className="text-sm font-semibold text-danger">-{formatBRL(amount)}</p>
-      <Link to={`/cartoes/${cardId}/fatura/pagar?offset=0`}>
+      <Link to={`/cartoes/${cardId}/fatura/pagar?offset=${periodOffset}`}>
         <Button type="button" variant="secondary" className="w-full px-2 py-1.5 text-xs">
           Pagar
         </Button>
