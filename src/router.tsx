@@ -76,6 +76,13 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'cartoes/:cardId/corrigir-importacao',
+          lazy: async () => {
+            const { FixImportedInvoicePage } = await import('./features/cards/FixImportedInvoicePage')
+            return { Component: FixImportedInvoicePage }
+          },
+        },
+        {
           path: 'contas',
           lazy: async () => {
             const { AccountsPage } = await import('./features/accounts/AccountsPage')
