@@ -97,6 +97,9 @@ export async function payCardInvoice(
       categoryId: params.categoryId,
       paid: true,
       accountId: params.accountId,
+      // guarda quais transações do cartão esta fechou — se esta virar
+      // não-paga de novo (edição ou exclusão), elas reabrem junto.
+      paidTransactionIds: params.unpaidTransactionIds,
       createdBy: params.createdBy,
     })
 

@@ -15,6 +15,11 @@ export interface Transaction {
   installmentGroupId?: string // presente sse parte de um parcelamento
   installmentIndex?: number // 1-based
   installmentTotal?: number
+  // presente sse esta é a transação "Pagamento fatura X" criada por
+  // payCardInvoice — guarda os ids das transações de cartão que ela fechou.
+  // Se esta transação for editada de volta pra não-paga (ou apagada), essas
+  // voltam a não-pagas junto — ver updateTransaction/deleteTransaction.
+  paidTransactionIds?: string[]
   createdBy: string // uid de quem criou — nunca alterado em updates
 }
 

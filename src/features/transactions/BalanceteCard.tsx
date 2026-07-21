@@ -18,7 +18,14 @@ export function BalanceteCard({ transactions, selectedMonth, cardsById }: Balanc
     // movimento. A pagar/a receber ainda não aconteceram: pra cartão, só
     // fazem sentido no mês de VENCIMENTO da fatura (pode ser diferente do
     // mês da compra), não na data da compra em si.
-    const paidOfMonth = transactions.filter((t) => t.paid && t.date.startsWith(selectedMonth))
+    // Cartão pago nunca entra aqui individualmente — pagar a fatura já cria
+    // sua própria transação "Pagamento fatura X" vinculada à conta; contar
+    // a compra original TAMBÉM duplicaria o valor (mesmo raciocínio de
+    // groupCardTransactionsByInvoice: cartão só conta pela fatura/pagamento
+    // agregado, nunca compra a compra).
+    const paidOfMonth = transactions.filter(
+      (t) => t.paid && t.accountId !== undefined && t.date.startsWith(selectedMonth),
+    )
     const unpaidOfMonth = transactions.filter(
       (t) => !t.paid && effectiveMonth(t, cardsById) === selectedMonth,
     )

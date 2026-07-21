@@ -30,6 +30,7 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
             installmentTotal: t.installmentTotal,
           }
         : {}),
+      ...(t.paidTransactionIds !== undefined ? { paidTransactionIds: t.paidTransactionIds } : {}),
     }
     return t.accountId !== undefined ? { ...base, accountId: t.accountId } : { ...base, cardId: t.cardId }
   },
@@ -41,6 +42,9 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
     const recurringRuleId = typeof data.recurringRuleId === 'string' ? data.recurringRuleId : undefined
     const installmentGroupId =
       typeof data.installmentGroupId === 'string' ? data.installmentGroupId : undefined
+    const paidTransactionIds = Array.isArray(data.paidTransactionIds)
+      ? data.paidTransactionIds.filter((id): id is string => typeof id === 'string')
+      : undefined
     return {
       id: snapshot.id,
       type,
@@ -62,6 +66,7 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
             installmentTotal: typeof data.installmentTotal === 'number' ? data.installmentTotal : 1,
           }
         : {}),
+      ...(paidTransactionIds !== undefined ? { paidTransactionIds } : {}),
     }
   },
 }
@@ -184,6 +189,17 @@ export async function updateTransaction(
     }
     const newAccountBalance = newAccountSnap?.exists() ? newAccountSnap.data().balance : undefined
 
+    // READ 4: se isto é a transação "Pagamento fatura X" (tem
+    // paidTransactionIds) voltando de paga pra não-paga, as transações de
+    // cartão que ela fechou reabrem junto — senão ficam presas em "paga"
+    // pra sempre, sem nenhuma fatura em aberto que as represente.
+    const reopening = oldData.paid === true && data.paid === false
+    const reopenIds = reopening ? (oldData.paidTransactionIds ?? []) : []
+    const reopenSnaps = []
+    for (const id of reopenIds) {
+      reopenSnaps.push(await transaction.get(transactionDoc(uid, id)))
+    }
+
     // --- só writes daqui pra baixo ---
     if (sameAccount && oldAccountId !== undefined && oldAccountBalance !== undefined) {
       // mesma conta absorve reversão + aplicação num único write (cobre
@@ -200,10 +216,21 @@ export async function updateTransaction(
       }
     }
 
+    for (const snap of reopenSnaps) {
+      if (snap.exists()) transaction.update(transactionDoc(uid, snap.id), { paid: false })
+    }
+
     // `set` sobrescreve o doc inteiro — precisa levar adiante o
     // `createdBy` original (não vem em `data`, que é só o form) senão a
-    // autoria se perde a cada edição.
-    transaction.set(txRef, { id: transactionId, createdBy: oldData.createdBy, ...data })
+    // autoria se perde a cada edição. `paidTransactionIds` também não vem
+    // do form (é gravado só por payCardInvoice) — preserva o valor antigo
+    // senão some na primeira edição manual desta transação.
+    transaction.set(txRef, {
+      id: transactionId,
+      createdBy: oldData.createdBy,
+      ...data,
+      ...(oldData.paidTransactionIds !== undefined ? { paidTransactionIds: oldData.paidTransactionIds } : {}),
+    })
   })
 }
 
@@ -223,10 +250,23 @@ export async function deleteTransaction(uid: string, transactionId: string): Pro
       throw new Error('Conta vinculada não encontrada.')
     }
 
+    // Apagar a transação "Pagamento fatura X" some com o registro do
+    // pagamento, mas o que ela fechou continua marcado como pago pra
+    // sempre se não reabrir aqui também — mesma lógica de updateTransaction
+    // reabrindo quando `paid` volta pra false.
+    const reopenIds = txData.paid === true ? (txData.paidTransactionIds ?? []) : []
+    const reopenSnaps = []
+    for (const id of reopenIds) {
+      reopenSnaps.push(await transaction.get(transactionDoc(uid, id)))
+    }
+
     if (txData.accountId !== undefined && txData.paid === true && accountSnap?.exists()) {
       transaction.update(accountDoc(uid, txData.accountId), {
         balance: accountSnap.data().balance - signedEffect(txData.type, txData.amount),
       })
+    }
+    for (const snap of reopenSnaps) {
+      if (snap.exists()) transaction.update(transactionDoc(uid, snap.id), { paid: false })
     }
     transaction.delete(txRef)
   })
