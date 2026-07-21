@@ -3,7 +3,7 @@ import { db } from '../../lib/firebase'
 import { accountDoc } from '../accounts/api'
 import { transactionsCollection, transactionDoc, signedEffect } from './api'
 import { addMonthsClamped, parseDate, formatDate, roundToCents } from './dateUtils'
-import type { TransactionFormData } from './types'
+import type { TransactionFormData, TransactionType } from './types'
 
 export interface InstallmentFormData {
   amount: number
@@ -18,21 +18,22 @@ export interface InstallmentFormData {
 // `amountIsPerInstallment`, cada parcela usa `data.amount` como está; caso
 // contrário `data.amount` é o total a dividir — a última parcela absorve o
 // resto do arredondamento, pra soma bater exatamente com o valor declarado.
-// Mesmo padrão de createRecurringExpense: runTransaction (a 1ª parcela pode
-// nascer paga, precisa mover saldo atomicamente com a criação) e IDs
+// Mesmo padrão de createRecurringTransaction: runTransaction (a 1ª parcela
+// pode nascer paga, precisa mover saldo atomicamente com a criação) e IDs
 // determinísticos (`${groupId}_${index}`) — aqui só por consistência com o
 // resto do código, já que parcelamento não tem top-up (série finita, gerada
 // de uma vez só, sem necessidade de idempotência entre chamadas).
-export async function createInstallmentExpense(
+export async function createInstallmentTransaction(
   uid: string,
   data: InstallmentFormData,
+  type: TransactionType,
   installments: number,
   amountIsPerInstallment: boolean,
   firstOccurrencePaid: boolean,
   createdBy: string,
 ): Promise<string> {
   if ((data.accountId !== undefined) === (data.cardId !== undefined)) {
-    throw new Error('A despesa deve estar vinculada a exatamente uma conta ou um cartão.')
+    throw new Error('O lançamento deve estar vinculado a exatamente uma conta ou um cartão.')
   }
 
   const groupRef = doc(transactionsCollection(uid))
@@ -54,7 +55,7 @@ export async function createInstallmentExpense(
     const { year: y, month1based: m, day: d } = addMonthsClamped(year, month1based, day, index - 1)
     const amount = index === installments ? lastInstallmentAmount : perInstallmentAmount
     const base = {
-      type: 'expense' as const,
+      type,
       amount,
       date: formatDate(y, m, d),
       description: `${data.description} (${index}/${installments})`,
@@ -81,7 +82,7 @@ export async function createInstallmentExpense(
 
     if (data.accountId !== undefined && firstOccurrencePaid && accountSnap?.exists()) {
       transaction.update(accountDoc(uid, data.accountId), {
-        balance: accountSnap.data().balance + signedEffect('expense', first.amount),
+        balance: accountSnap.data().balance + signedEffect(type, first.amount),
       })
     }
 

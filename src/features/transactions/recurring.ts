@@ -11,10 +11,11 @@ import { db } from '../../lib/firebase'
 import { accountDoc } from '../accounts/api'
 import { transactionDoc, signedEffect } from './api'
 import { addMonthsClamped, daysInMonth, formatDate, monthsBetween, parseDate } from './dateUtils'
-import type { TransactionFormData } from './types'
+import type { TransactionFormData, TransactionType } from './types'
 
 export interface RecurringRule {
   id: string
+  type: TransactionType
   amount: number
   description: string
   categoryId: string
@@ -34,9 +35,12 @@ export interface RecurringRuleFormData {
   cardId?: string
 }
 
+// NOTE: regras salvas antes da receita recorrente existir não têm `type`
+// gravado — tratamos como 'expense' (única opção que existia até então).
 const recurringRuleConverter: FirestoreDataConverter<RecurringRule> = {
   toFirestore: (r) => {
     const base = {
+      type: r.type,
       amount: r.amount,
       description: r.description,
       categoryId: r.categoryId,
@@ -52,6 +56,7 @@ const recurringRuleConverter: FirestoreDataConverter<RecurringRule> = {
     const cardId = typeof data.cardId === 'string' ? data.cardId : undefined
     return {
       id: snapshot.id,
+      type: data.type === 'income' ? 'income' : 'expense',
       amount: typeof data.amount === 'number' ? data.amount : 0,
       description: typeof data.description === 'string' ? data.description : '',
       categoryId: typeof data.categoryId === 'string' ? data.categoryId : '',
@@ -83,11 +88,11 @@ function firstOccurrenceDate(dayOfMonth: number, today: Date = new Date()): stri
 
 // Gera `count` ocorrências mensais SEGUINTES a `afterDate` (exclusive), no
 // mesmo dia-do-mês da regra. Sempre `paid: false` — é o caller
-// (createRecurringExpense) quem decide se a 1ª ocorrência nasce paga; esta
-// função nunca gera doc pago, então nunca precisa tocar em saldo de conta —
-// puramente determinística, sem I/O.
+// (createRecurringTransaction) quem decide se a 1ª ocorrência nasce paga;
+// esta função nunca gera doc pago, então nunca precisa tocar em saldo de
+// conta — puramente determinística, sem I/O.
 export function generateRecurringOccurrences(
-  rule: Pick<RecurringRule, 'amount' | 'description' | 'categoryId' | 'accountId' | 'cardId' | 'dayOfMonth'>,
+  rule: Pick<RecurringRule, 'type' | 'amount' | 'description' | 'categoryId' | 'accountId' | 'cardId' | 'dayOfMonth'>,
   recurringRuleId: string,
   afterDate: string,
   count: number,
@@ -97,7 +102,7 @@ export function generateRecurringOccurrences(
   for (let i = 1; i <= count; i++) {
     const { year: y, month1based: m, day } = addMonthsClamped(year, month1based, rule.dayOfMonth, i)
     const base = {
-      type: 'expense' as const,
+      type: rule.type,
       amount: rule.amount,
       date: formatDate(y, m, day),
       description: rule.description,
@@ -121,9 +126,10 @@ export function generateRecurringOccurrences(
 // nascer paga (`firstOccurrencePaid`), e se nascer paga ela precisa afetar
 // o saldo da conta atomicamente com sua própria criação — mesma regra de
 // createTransaction. writeBatch não faz esse read+write atômico da conta.
-export async function createRecurringExpense(
+export async function createRecurringTransaction(
   uid: string,
   data: RecurringRuleFormData,
+  type: TransactionType,
   firstOccurrencePaid: boolean,
   createdBy: string,
 ): Promise<string> {
@@ -133,9 +139,9 @@ export async function createRecurringExpense(
 
   const ruleRef = doc(recurringRulesCollection(uid))
   const firstDate = firstOccurrenceDate(data.dayOfMonth)
-  const rest = generateRecurringOccurrences(data, ruleRef.id, firstDate, 11)
+  const rest = generateRecurringOccurrences({ ...data, type }, ruleRef.id, firstDate, 11)
   const first: TransactionFormData & { recurringRuleId: string } = {
-    type: 'expense',
+    type,
     amount: data.amount,
     date: firstDate,
     description: data.description,
@@ -156,7 +162,7 @@ export async function createRecurringExpense(
 
     if (data.accountId !== undefined && firstOccurrencePaid && accountSnap?.exists()) {
       transaction.update(accountDoc(uid, data.accountId), {
-        balance: accountSnap.data().balance + signedEffect('expense', data.amount),
+        balance: accountSnap.data().balance + signedEffect(type, data.amount),
       })
     }
 
@@ -167,6 +173,7 @@ export async function createRecurringExpense(
 
     transaction.set(ruleRef, {
       id: ruleRef.id,
+      type,
       amount: data.amount,
       description: data.description,
       categoryId: data.categoryId,

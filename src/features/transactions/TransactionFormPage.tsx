@@ -13,8 +13,8 @@ import { Select } from '../../components/ui/Select'
 import { cn } from '../../lib/utils'
 import { expenseSchema, incomeSchema, type ExpenseFormData, type IncomeFormData } from './schemas'
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from './api'
-import { createRecurringExpense } from './recurring'
-import { createInstallmentExpense } from './installments'
+import { createRecurringTransaction } from './recurring'
+import { createInstallmentTransaction } from './installments'
 import type { TransactionFormData } from './types'
 
 type Kind = 'despesa' | 'receita'
@@ -60,7 +60,17 @@ export function TransactionFormPage() {
   })
   const incomeForm = useForm<IncomeFormData>({
     resolver: zodResolver(incomeSchema),
-    defaultValues: { amount: 0, date: todayISO(), description: '', categoryId: '', accountId: '', paid: true },
+    defaultValues: {
+      amount: 0,
+      date: todayISO(),
+      description: '',
+      categoryId: '',
+      accountId: '',
+      paid: true,
+      recurrence: 'none',
+      installmentsCount: 2,
+      installmentAmountMode: 'total',
+    },
   })
 
   useEffect(() => {
@@ -95,6 +105,9 @@ export function TransactionFormPage() {
             categoryId: transaction.categoryId,
             accountId: transaction.accountId ?? '',
             paid: transaction.paid,
+            recurrence: 'none',
+            installmentsCount: 2,
+            installmentAmountMode: 'total',
           })
         }
         setIsLoadingTransaction(false)
@@ -137,7 +150,7 @@ export function TransactionFormPage() {
         }
         await updateTransaction(workspaceId, transactionId, payload)
       } else if (data.recurrence === 'fixed') {
-        await createRecurringExpense(
+        await createRecurringTransaction(
           workspaceId,
           {
             amount: data.amount,
@@ -146,13 +159,15 @@ export function TransactionFormPage() {
             dayOfMonth: Number(data.date.slice(-2)),
             ...linkage,
           },
+          'expense',
           paidOnCreate,
           user.uid,
         )
       } else if (data.recurrence === 'installments') {
-        await createInstallmentExpense(
+        await createInstallmentTransaction(
           workspaceId,
           { amount: data.amount, description: data.description, categoryId: data.categoryId, date: data.date, ...linkage },
+          'expense',
           data.installmentsCount ?? 2,
           data.installmentAmountMode === 'perInstallment',
           paidOnCreate,
@@ -179,19 +194,60 @@ export function TransactionFormPage() {
   async function onSubmitIncome(data: IncomeFormData) {
     if (!user || !workspaceId) return
     setFormError(null)
-    const payload: TransactionFormData = {
-      type: 'income',
-      amount: data.amount,
-      date: data.date,
-      description: data.description,
-      categoryId: data.categoryId,
-      accountId: data.accountId,
-      paid: data.paid,
-    }
     try {
       if (transactionId) {
+        // Edição só afeta esta ocorrência — não recria a série de
+        // recorrência/parcelamento.
+        const payload: TransactionFormData = {
+          type: 'income',
+          amount: data.amount,
+          date: data.date,
+          description: data.description,
+          categoryId: data.categoryId,
+          accountId: data.accountId,
+          paid: data.paid,
+        }
         await updateTransaction(workspaceId, transactionId, payload)
+      } else if (data.recurrence === 'fixed') {
+        await createRecurringTransaction(
+          workspaceId,
+          {
+            amount: data.amount,
+            description: data.description,
+            categoryId: data.categoryId,
+            dayOfMonth: Number(data.date.slice(-2)),
+            accountId: data.accountId,
+          },
+          'income',
+          data.paid,
+          user.uid,
+        )
+      } else if (data.recurrence === 'installments') {
+        await createInstallmentTransaction(
+          workspaceId,
+          {
+            amount: data.amount,
+            description: data.description,
+            categoryId: data.categoryId,
+            date: data.date,
+            accountId: data.accountId,
+          },
+          'income',
+          data.installmentsCount ?? 2,
+          data.installmentAmountMode === 'perInstallment',
+          data.paid,
+          user.uid,
+        )
       } else {
+        const payload: TransactionFormData = {
+          type: 'income',
+          amount: data.amount,
+          date: data.date,
+          description: data.description,
+          categoryId: data.categoryId,
+          accountId: data.accountId,
+          paid: data.paid,
+        }
         await createTransaction(workspaceId, payload, user.uid)
       }
       navigate('/registros')
@@ -253,6 +309,8 @@ export function TransactionFormPage() {
   const installmentAmountMode = expenseForm.watch('installmentAmountMode')
   const expensePaid = expenseForm.watch('paid')
   const incomePaid = incomeForm.watch('paid')
+  const incomeRecurrence = incomeForm.watch('recurrence')
+  const incomeInstallmentAmountMode = incomeForm.watch('installmentAmountMode')
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">
@@ -526,6 +584,85 @@ export function TransactionFormPage() {
             Já foi recebida?
             <span>{incomePaid ? 'Sim' : 'Não'}</span>
           </button>
+
+          {!isEditMode ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm text-light-secondary dark:text-dark-secondary">Recorrência</span>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ['none', 'Nenhuma'],
+                    ['fixed', 'Fixa'],
+                    ['installments', 'Parcelamento'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => incomeForm.setValue('recurrence', value)}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      incomeRecurrence === value
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                        : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {incomeRecurrence === 'fixed' ? (
+                <p className="text-sm text-light-secondary dark:text-dark-secondary">
+                  Gera 12 lançamentos mensais no dia {incomeForm.watch('date').slice(-2)}, renovando
+                  automaticamente conforme se aproxima do fim.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {!isEditMode && incomeRecurrence === 'installments' ? (
+            <div className="flex flex-col gap-4 rounded-xl border border-border-light p-4 dark:border-border-dark">
+              <Input
+                label="Número de parcelas"
+                type="number"
+                min={2}
+                max={48}
+                error={incomeForm.formState.errors.installmentsCount?.message}
+                {...incomeForm.register('installmentsCount', { valueAsNumber: true })}
+              />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm text-light-secondary dark:text-dark-secondary">
+                  O valor informado é
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => incomeForm.setValue('installmentAmountMode', 'total')}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      incomeInstallmentAmountMode === 'total'
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                        : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+                    )}
+                  >
+                    O total a parcelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => incomeForm.setValue('installmentAmountMode', 'perInstallment')}
+                    className={cn(
+                      'flex-1 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      incomeInstallmentAmountMode === 'perInstallment'
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                        : 'border-border-light text-light-secondary dark:border-border-dark dark:text-dark-secondary',
+                    )}
+                  >
+                    O valor de cada parcela
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {formError ? <p className="text-sm text-danger">{formError}</p> : null}
 
