@@ -3,7 +3,7 @@ import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 import { TransactionCompactCard } from './TransactionCompactCard'
 import { CardInvoiceRowCard } from '../cards/CardInvoiceRowCard'
 import { groupCardTransactionsByInvoice, type CardInvoiceGroup } from '../cards/invoiceUtils'
-import { formatBRL } from '../../lib/utils'
+import { cn, formatBRL } from '../../lib/utils'
 import type { Transaction } from './types'
 import type { Category } from '../categories/types'
 import type { Account } from '../accounts/types'
@@ -112,16 +112,24 @@ export function TransactionsGrid({
     return { expenses, incomes, expenseGroups, incomeGroups, totalExpenses, totalIncomes }
   }, [transactions, selectedMonth, cards])
 
+  const resultado = totalIncomes - totalExpenses
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border-light bg-surface-light p-4 dark:border-border-dark dark:bg-surface-dark-elevated">
+      <div className="grid grid-cols-3 gap-2 rounded-2xl border border-border-light bg-surface-light p-4 dark:border-border-dark dark:bg-surface-dark-elevated">
         <div className="min-w-0">
           <p className="text-xs text-light-secondary dark:text-dark-secondary">Despesas</p>
-          <p className="truncate text-lg font-semibold text-danger">{formatBRL(totalExpenses)}</p>
+          <p className="truncate text-sm font-semibold text-danger">{formatBRL(totalExpenses)}</p>
         </div>
         <div className="min-w-0">
           <p className="text-xs text-light-secondary dark:text-dark-secondary">Receitas</p>
-          <p className="truncate text-lg font-semibold text-brand-500">{formatBRL(totalIncomes)}</p>
+          <p className="truncate text-sm font-semibold text-brand-500">{formatBRL(totalIncomes)}</p>
+        </div>
+        <div className="min-w-0 border-l border-border-light pl-2 dark:border-border-dark">
+          <p className="text-xs text-light-secondary dark:text-dark-secondary">Resultado</p>
+          <p className={cn('truncate text-sm font-semibold', resultado >= 0 ? 'text-brand-500' : 'text-danger')}>
+            {formatBRL(resultado)}
+          </p>
         </div>
       </div>
 
