@@ -3,8 +3,10 @@ import { db } from '../../lib/firebase'
 import { accountDoc } from './api'
 
 // Transferência entre contas do próprio usuário — não é receita nem
-// despesa, então nunca cria Transaction, só move saldo atomicamente
-// (mesmo raciocínio de depositToCaixinha/withdrawFromCaixinha).
+// despesa, então nunca cria Transaction, só move saldo atomicamente. (Já
+// guardar/resgatar de caixinha cria Transaction vinculada — ali o dinheiro
+// sai/entra do "mundo visível" da conta de verdade; aqui ele só troca de
+// conta, então nenhum lado do extrato deveria mostrar nada.)
 export async function transferBetweenAccounts(
   uid: string,
   fromAccountId: string,
