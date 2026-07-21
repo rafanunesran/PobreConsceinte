@@ -253,8 +253,8 @@ export const router = createBrowserRouter(
       ],
     },
   ],
-  // NOTE: no GitHub Pages o app fica sob /PobreConsceinte/ (project page),
+  // NOTE: no GitHub Pages o app fica sob /PobreConsciente/ (project page),
   // não na raiz do domínio. import.meta.env.BASE_URL reflete o `base` do
-  // vite.config.ts automaticamente (dev: "/", build: "/PobreConsceinte/").
+  // vite.config.ts automaticamente (dev: "/", build: "/PobreConsciente/").
   { basename: import.meta.env.BASE_URL },
 )

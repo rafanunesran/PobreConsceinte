@@ -6,9 +6,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
   // NOTE: publicado como project page no GitHub Pages
-  // (rafanunesran.github.io/PobreConsceinte/), não na raiz do domínio —
+  // (rafanunesran.github.io/PobreConsciente/), não na raiz do domínio —
   // por isso o base só é diferente de "/" no build de produção.
-  base: command === 'build' ? '/PobreConsceinte/' : '/',
+  base: command === 'build' ? '/PobreConsciente/' : '/',
   plugins: [
     react(),
     tailwindcss(),
@@ -24,8 +24,8 @@ export default defineConfig(({ command }) => ({
         clientsClaim: true,
       },
       manifest: {
-        name: 'Pobre Consceinte',
-        short_name: 'Pobre Consceinte',
+        name: 'Pobre Consciente',
+        short_name: 'Pobre Consciente',
         description: 'Controle financeiro pessoal',
         lang: 'pt-BR',
         theme_color: '#10B981',
