@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -8,11 +8,11 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
 } from 'firebase/auth'
-import { FirebaseError } from 'firebase/app'
 import { auth } from '../../lib/firebase'
 import { useAuthStore } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { mapAuthError } from './authErrors'
 import {
   loginSchema,
   signUpSchema,
@@ -23,26 +23,6 @@ import {
 type Mode = 'login' | 'signup'
 
 const googleProvider = new GoogleAuthProvider()
-
-// NOTE: o SDK do Firebase só retorna códigos de erro em inglês
-// (ex: "auth/wrong-password"); mapeamos os mais comuns pra PT-BR.
-function mapAuthError(error: unknown): string {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
-      case 'auth/invalid-credential':
-      case 'auth/wrong-password':
-      case 'auth/user-not-found':
-        return 'E-mail ou senha incorretos.'
-      case 'auth/email-already-in-use':
-        return 'Este e-mail já está cadastrado.'
-      case 'auth/popup-closed-by-user':
-        return 'Login com Google cancelado.'
-      default:
-        return 'Não foi possível completar a operação. Tente novamente.'
-    }
-  }
-  return 'Não foi possível completar a operação. Tente novamente.'
-}
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -143,6 +123,12 @@ export function LoginPage() {
               error={loginForm.formState.errors.password?.message}
               {...loginForm.register('password')}
             />
+            <Link
+              to="/esqueci-senha"
+              className="-mt-2 self-end text-sm text-light-secondary transition-colors duration-200 hover:text-brand-500 dark:text-dark-secondary"
+            >
+              Esqueci minha senha
+            </Link>
             {formError ? <p className="text-sm text-danger">{formError}</p> : null}
             <Button type="submit" disabled={loginForm.formState.isSubmitting}>
               {loginForm.formState.isSubmitting ? 'Entrando...' : 'Entrar'}
