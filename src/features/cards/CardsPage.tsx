@@ -83,7 +83,11 @@ export function CardsPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="lg:w-1/4">
+          {/* No mobile (flex-col), a ordem visual vem de `order-*`, não da
+              ordem no DOM: Limites fica por último, depois de Faturas e dos
+              cards de cada cartão. No desktop (lg:flex-row), `lg:order-*`
+              devolve o layout original — Limites na coluna esquerda. */}
+          <div className="order-2 lg:order-1 lg:w-1/4">
             <CardsTotalCard
               totalLimit={totalLimit}
               totalOccupied={totalOccupied}
@@ -91,7 +95,7 @@ export function CardsPage() {
             />
           </div>
 
-          <div className="flex flex-col gap-6 lg:w-3/4">
+          <div className="order-1 flex flex-col gap-6 lg:order-2 lg:w-3/4">
             <InvoicesSummaryCard offset={invoiceOffset} onOffsetChange={setInvoiceOffset} month={invoiceMonth} />
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
