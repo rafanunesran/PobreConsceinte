@@ -46,15 +46,18 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">
-      <section className="rounded-2xl border border-border-light bg-surface-light p-6 dark:border-border-dark dark:bg-gradient-to-b dark:from-surface-dark dark:to-surface-dark-elevated">
-        <p className="text-sm text-light-secondary dark:text-dark-secondary">Saldo total</p>
+      <Link
+        to="/saldo"
+        className="block rounded-2xl border border-border-light bg-surface-light p-6 transition-all duration-200 hover:border-brand-500 dark:border-border-dark dark:bg-gradient-to-b dark:from-surface-dark dark:to-surface-dark-elevated"
+      >
+        <p className="text-sm text-light-secondary dark:text-dark-secondary">Saldo atual</p>
         <p className="mt-2 text-3xl font-semibold text-light-primary dark:text-dark-primary">
           {loading ? '···' : formatBRL(totalBalance)}
         </p>
         <p className="mt-1 text-sm text-light-secondary dark:text-dark-secondary">
           {accounts.length === 0 ? 'Nenhuma conta conectada ainda' : `${accounts.length} conta(s)`}
         </p>
-      </section>
+      </Link>
 
       <section className="flex justify-between">
         {quickActions.map(({ label, icon: Icon, to }) => (

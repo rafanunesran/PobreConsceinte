@@ -209,6 +209,13 @@ export const router = createBrowserRouter(
           },
         },
         {
+          path: 'saldo',
+          lazy: async () => {
+            const { BalanceHistoryPage } = await import('./features/transactions/BalanceHistoryPage')
+            return { Component: BalanceHistoryPage }
+          },
+        },
+        {
           path: 'registros/novo',
           lazy: async () => {
             const { RegistroChooserPage } = await import('./features/transactions/RegistroChooserPage')
