@@ -176,6 +176,51 @@ export function FloatingCalculator({ onClose }: FloatingCalculatorProps) {
     }
   }
 
+  // Teclado do PC: mantém um ref pro handler mais recente (evita closure
+  // stale) e registra UM listener global. Ignora quando o foco está num
+  // campo de texto da página (a calculadora é não-modal — não pode
+  // sequestrar o que a pessoa digita num input/textarea atrás dela).
+  const handleKeyRef = useRef<(key: string) => void>(() => {})
+  handleKeyRef.current = handleKey
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+
+      const k = e.key
+      let mapped: string | null = null
+      if (k >= '0' && k <= '9') mapped = k
+      else if (k === '.' || k === ',') mapped = '.'
+      else if (k === '+') mapped = '+'
+      else if (k === '-') mapped = '−'
+      else if (k === '*') mapped = '×'
+      else if (k === '/') mapped = '÷'
+      else if (k === 'Enter' || k === '=') mapped = '='
+      else if (k === 'Backspace') mapped = '⌫'
+      else if (k === 'Delete' || k === 'c' || k === 'C') mapped = 'C'
+      else if (k === 'Escape') {
+        onClose()
+        return
+      }
+
+      if (mapped) {
+        e.preventDefault()
+        handleKeyRef.current(mapped)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   // Prévia da expressão (tokens confirmados) acima do display.
   const expression = tokens
     .map((t) => (typeof t === 'number' ? parseFloat(t.toFixed(10)).toString() : t))
