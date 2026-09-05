@@ -15,7 +15,15 @@ import { expenseSchema, incomeSchema, type ExpenseFormData, type IncomeFormData 
 import { createTransaction, deleteTransaction, getTransaction, updateTransaction } from './api'
 import { createRecurringTransaction } from './recurring'
 import { createInstallmentTransaction } from './installments'
-import type { TransactionFormData } from './types'
+import {
+  deleteTransactionSeries,
+  fetchSeriesTransactions,
+  seriesKindOf,
+  updateTransactionSeries,
+  type SeriesScope,
+} from './series'
+import { SeriesScopeDialog } from './SeriesScopeDialog'
+import type { Transaction, TransactionFormData } from './types'
 
 type Kind = 'despesa' | 'receita'
 
@@ -41,6 +49,17 @@ export function TransactionFormPage() {
   const [loadError, setLoadError] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Lançamento carregado (não só o form): é dele que saem `recurringRuleId`/
+  // `installmentGroupId`, que dizem se esta edição precisa perguntar o
+  // alcance. `series` é a série completa, usada só pra mostrar quantos
+  // lançamentos cada opção do diálogo afeta.
+  const [loadedTransaction, setLoadedTransaction] = useState<Transaction | null>(null)
+  const [series, setSeries] = useState<Transaction[]>([])
+  const [scopePrompt, setScopePrompt] = useState<
+    { action: 'edit'; payload: TransactionFormData } | { action: 'delete' } | null
+  >(null)
+  const [scopeBusy, setScopeBusy] = useState(false)
+  const [scopeError, setScopeError] = useState<string | null>(null)
 
   const expenseForm = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
@@ -82,6 +101,16 @@ export function TransactionFormPage() {
         if (!transaction) {
           navigate('/registros', { replace: true })
           return
+        }
+        setLoadedTransaction(transaction)
+        if (seriesKindOf(transaction) !== null) {
+          // só pros contadores do diálogo de alcance — se falhar, o
+          // diálogo ainda aparece, apenas sem os números.
+          fetchSeriesTransactions(workspaceId, transaction)
+            .then((found) => {
+              if (!cancelled) setSeries(found)
+            })
+            .catch(() => undefined)
         }
         if (isExpense) {
           expenseForm.reset({
@@ -137,8 +166,6 @@ export function TransactionFormPage() {
 
     try {
       if (transactionId) {
-        // Edição só afeta esta ocorrência — não recria a série de
-        // recorrência/parcelamento.
         const payload: TransactionFormData = {
           type: 'expense',
           amount: data.amount,
@@ -147,6 +174,13 @@ export function TransactionFormPage() {
           categoryId: data.categoryId,
           paid: data.paid,
           ...linkage,
+        }
+        // Lançamento de série (fixo ou parcelado): antes de gravar,
+        // pergunta o alcance — quem grava é handleScopeConfirm.
+        if (loadedTransaction && seriesKindOf(loadedTransaction) !== null) {
+          setScopeError(null)
+          setScopePrompt({ action: 'edit', payload })
+          return
         }
         await updateTransaction(workspaceId, transactionId, payload)
       } else if (data.recurrence === 'fixed') {
@@ -196,8 +230,6 @@ export function TransactionFormPage() {
     setFormError(null)
     try {
       if (transactionId) {
-        // Edição só afeta esta ocorrência — não recria a série de
-        // recorrência/parcelamento.
         const payload: TransactionFormData = {
           type: 'income',
           amount: data.amount,
@@ -206,6 +238,13 @@ export function TransactionFormPage() {
           categoryId: data.categoryId,
           accountId: data.accountId,
           paid: data.paid,
+        }
+        // Lançamento de série (fixo ou parcelado): antes de gravar,
+        // pergunta o alcance — quem grava é handleScopeConfirm.
+        if (loadedTransaction && seriesKindOf(loadedTransaction) !== null) {
+          setScopeError(null)
+          setScopePrompt({ action: 'edit', payload })
+          return
         }
         await updateTransaction(workspaceId, transactionId, payload)
       } else if (data.recurrence === 'fixed') {
@@ -268,6 +307,30 @@ export function TransactionFormPage() {
     }
   }
 
+  // Único ponto que grava quando o lançamento faz parte de uma série — o
+  // escopo escolhido decide se a alteração/exclusão para nele, alcança os
+  // pendentes ou a série toda.
+  async function handleScopeConfirm(scope: SeriesScope) {
+    if (!workspaceId || !scopePrompt || !loadedTransaction) return
+    setScopeBusy(true)
+    setScopeError(null)
+    try {
+      if (scopePrompt.action === 'edit') {
+        await updateTransactionSeries(workspaceId, loadedTransaction, scopePrompt.payload, scope)
+      } else {
+        await deleteTransactionSeries(workspaceId, loadedTransaction, scope)
+      }
+      navigate('/registros')
+    } catch {
+      setScopeError(
+        scopePrompt.action === 'edit'
+          ? 'Não foi possível salvar. Tente novamente.'
+          : 'Não foi possível excluir. Tente novamente.',
+      )
+      setScopeBusy(false)
+    }
+  }
+
   if (isEditMode && isLoadingTransaction) {
     return (
       <div className="px-6 pt-4 text-sm text-light-secondary dark:text-dark-secondary">
@@ -304,6 +367,16 @@ export function TransactionFormPage() {
     )
   }
 
+  const seriesKind = loadedTransaction ? seriesKindOf(loadedTransaction) : null
+  // Contadores do diálogo: o próprio lançamento entra em 'pendentes' mesmo
+  // se já estiver pago — foi nele que a ação começou (ver isInScope em
+  // series.ts). Sem a série carregada, sobra ao menos ele mesmo.
+  const totalCount = series.length > 0 ? series.length : 1
+  const pendingCount =
+    series.length > 0
+      ? series.filter((t) => t.id === loadedTransaction?.id || !t.paid).length
+      : 1
+
   const linkedType = expenseForm.watch('linkedType')
   const recurrence = expenseForm.watch('recurrence')
   const installmentAmountMode = expenseForm.watch('installmentAmountMode')
@@ -314,9 +387,20 @@ export function TransactionFormPage() {
 
   return (
     <div className="flex flex-col gap-6 px-6 pt-4">
-      <h1 className="text-xl font-semibold text-light-primary dark:text-dark-primary">
-        {isEditMode ? 'Editar' : 'Nova'} {isExpense ? 'despesa' : 'receita'}
-      </h1>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-semibold text-light-primary dark:text-dark-primary">
+          {isEditMode ? 'Editar' : 'Nova'} {isExpense ? 'despesa' : 'receita'}
+        </h1>
+        {seriesKind !== null ? (
+          <p className="text-sm text-light-secondary dark:text-dark-secondary">
+            {seriesKind === 'recurring'
+              ? 'Lançamento fixo'
+              : `Parcela ${loadedTransaction?.installmentIndex ?? 1}/${loadedTransaction?.installmentTotal ?? 1}`}{' '}
+            — ao salvar ou excluir você escolhe se vale só para este, para todos os pendentes ou
+            para todos.
+          </p>
+        ) : null}
+      </div>
 
       {isExpense ? (
         <form
@@ -674,7 +758,20 @@ export function TransactionFormPage() {
 
       {isEditMode ? (
         <div className="border-t border-border-light pt-4 dark:border-border-dark">
-          {confirmingDelete ? (
+          {seriesKind !== null ? (
+            // Série: a confirmação de exclusão é o próprio diálogo de
+            // alcance, que já pede confirmação explícita.
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setScopeError(null)
+                setScopePrompt({ action: 'delete' })
+              }}
+            >
+              Excluir
+            </Button>
+          ) : confirmingDelete ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-light-secondary dark:text-dark-secondary">
                 Tem certeza? Essa ação não pode ser desfeita.
@@ -705,6 +802,23 @@ export function TransactionFormPage() {
             </Button>
           )}
         </div>
+      ) : null}
+
+      {scopePrompt && seriesKind !== null && loadedTransaction ? (
+        <SeriesScopeDialog
+          action={scopePrompt.action}
+          kind={seriesKind}
+          type={loadedTransaction.type}
+          pendingCount={pendingCount}
+          totalCount={totalCount}
+          busy={scopeBusy}
+          error={scopeError}
+          onCancel={() => {
+            setScopePrompt(null)
+            setScopeError(null)
+          }}
+          onConfirm={handleScopeConfirm}
+        />
       ) : null}
     </div>
   )

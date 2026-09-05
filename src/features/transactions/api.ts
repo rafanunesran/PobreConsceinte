@@ -134,6 +134,24 @@ export async function createTransaction(
   return newTxRef.id
 }
 
+// Campos que amarram a transação à sua série (recorrência fixa ou
+// parcelamento). Não vêm do formulário — são gravados só na criação da
+// série — então updateTransaction os copia do doc antigo.
+function seriesFields(
+  transaction: Transaction,
+): Pick<Transaction, 'recurringRuleId' | 'installmentGroupId' | 'installmentIndex' | 'installmentTotal'> {
+  return {
+    ...(transaction.recurringRuleId !== undefined ? { recurringRuleId: transaction.recurringRuleId } : {}),
+    ...(transaction.installmentGroupId !== undefined
+      ? {
+          installmentGroupId: transaction.installmentGroupId,
+          installmentIndex: transaction.installmentIndex,
+          installmentTotal: transaction.installmentTotal,
+        }
+      : {}),
+  }
+}
+
 export async function updateTransaction(
   uid: string,
   transactionId: string,
@@ -224,10 +242,14 @@ export async function updateTransaction(
     // `createdBy` original (não vem em `data`, que é só o form) senão a
     // autoria se perde a cada edição. `paidTransactionIds` também não vem
     // do form (é gravado só por payCardInvoice) — preserva o valor antigo
-    // senão some na primeira edição manual desta transação.
+    // senão some na primeira edição manual desta transação. Mesma coisa
+    // pro vínculo com a série (recorrência fixa / parcelamento): o form não
+    // manda esses campos, e sem preservá-los a ocorrência se soltaria da
+    // série na primeira edição — quebrando o "aplicar a todas" depois.
     transaction.set(txRef, {
       id: transactionId,
       createdBy: oldData.createdBy,
+      ...seriesFields(oldData),
       ...data,
       ...(oldData.paidTransactionIds !== undefined ? { paidTransactionIds: oldData.paidTransactionIds } : {}),
     })

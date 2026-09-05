@@ -1,8 +1,11 @@
 import {
   collection,
+  deleteDoc,
   doc,
+  getDoc,
   getDocs,
   runTransaction,
+  setDoc,
   writeBatch,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
@@ -185,6 +188,48 @@ export async function createRecurringTransaction(
   })
 
   return ruleRef.id
+}
+
+// Aplica na REGRA a edição feita numa ocorrência — chamado quando o
+// usuário escolhe propagar a alteração pra série inteira (todas ou todas as
+// pendentes; nos dois casos as ocorrências ainda por gerar são futuras,
+// logo pendentes). Sem isto, o próximo topUpRecurringRules voltaria a gerar
+// ocorrências com os valores antigos.
+//
+// `setDoc` do doc inteiro (não `updateDoc` parcial): trocar conta por
+// cartão precisa REMOVER o campo antigo, e o converter só grava um dos
+// dois — um merge parcial deixaria os dois no doc.
+export async function updateRecurringRuleFromOccurrence(
+  uid: string,
+  ruleId: string,
+  data: RecurringRuleFormData & { type: TransactionType },
+): Promise<void> {
+  if ((data.accountId !== undefined) === (data.cardId !== undefined)) {
+    throw new Error('A regra recorrente deve estar vinculada a exatamente uma conta ou um cartão.')
+  }
+  const ref = recurringRuleDoc(uid, ruleId)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return // regra já apagada — as ocorrências existentes bastam
+  const rule = snap.data()
+  await setDoc(ref, {
+    id: ruleId,
+    type: data.type,
+    amount: data.amount,
+    description: data.description,
+    categoryId: data.categoryId,
+    dayOfMonth: data.dayOfMonth,
+    generatedUntil: rule.generatedUntil, // preservado: topUp continua de onde parou
+    createdBy: rule.createdBy, // autoria original, nunca reescrita
+    ...(data.accountId !== undefined ? { accountId: data.accountId } : { cardId: data.cardId }),
+  })
+}
+
+// Apagar as ocorrências não basta pra encerrar uma despesa/receita fixa: a
+// regra sobrevive e topUpRecurringRules geraria tudo de novo no próximo
+// carregamento do app. Chamado ao excluir a série (todas ou todas as
+// pendentes) — nos dois casos o que resta é histórico já pago.
+export async function deleteRecurringRule(uid: string, ruleId: string): Promise<void> {
+  await deleteDoc(recurringRuleDoc(uid, ruleId))
 }
 
 const TOP_UP_THRESHOLD_MONTHS = 6
